@@ -1525,6 +1525,7 @@ generateGame();
 (function(){
 'use strict';
 var q=function(s,r){return(r||document).querySelector(s)},qa=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+function fmtTime(ms){var s=Math.max(0,Math.floor(ms/1000)),m=Math.floor(s/60);return String(m).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
 function randInt(max){return Math.floor(Math.random()*max)}
 function shuffle(a){for(var i=a.length-1;i>0;i--){var j=randInt(i+1),t=a[i];a[i]=a[j];a[j]=t}return a}
 function range(n){return Array.from({length:n},function(_,i){return i})}
