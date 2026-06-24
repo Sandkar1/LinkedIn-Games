@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Queens Logic</title>
+<style>
+:root{
+  --bg:#f4f2ee;--panel:#fff;--ink:#1d2226;--muted:#5e666e;--line:#d9d5ce;
+  --accent:#0a66c2;--danger:#b42318;--ok:#057642;--shadow:0 10px 30px rgba(0,0,0,.10);
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink)}
+body{padding:clamp(10px,2vw,24px);touch-action:manipulation}
+button,input{font:inherit}
+button{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:.68rem 1rem;font-weight:700;cursor:pointer}
+button:not(.cell):hover{background:#f7f7f7}button:active{transform:translateY(1px)}button:disabled{opacity:.5;cursor:not-allowed}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.app{width:min(100%,980px);margin:auto;display:grid;grid-template-columns:minmax(0,640px) minmax(250px,1fr);gap:20px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
+.main{padding:clamp(12px,2vw,22px)}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.title{display:flex;align-items:center;gap:10px}.logo{font-size:2rem;line-height:1}.title h1{font-size:clamp(1.25rem,4vw,1.8rem);margin:0}.subtitle{font-size:.86rem;color:var(--muted);margin-top:2px}
+.timer{font-variant-numeric:tabular-nums;font-weight:800;white-space:nowrap}
+.size-control{display:grid;grid-template-columns:auto minmax(78px,110px) auto 1fr;gap:8px;align-items:center;margin:12px 0}
+.size-control label{font-weight:800;white-space:nowrap}.size-control input{width:100%;border:1px solid var(--line);border-radius:10px;padding:.66rem .72rem;background:#fff;color:var(--ink);font-weight:800;text-align:center}
+.size-control input:focus{outline:3px solid rgba(10,102,194,.22);border-color:var(--accent)}.size-control button{border-radius:10px;padding:.68rem .85rem}.size-help{color:var(--muted);font-size:.82rem;line-height:1.25}
+.board-shell{width:min(100%,646px);margin:auto;display:grid;grid-template-columns:24px minmax(0,1fr);grid-template-rows:auto 24px;align-items:stretch}.col-labels{grid-column:2;grid-row:2;display:grid;align-items:center;text-align:center;font-size:.72rem;font-weight:800;color:var(--muted)}.row-labels{grid-column:1;grid-row:1;display:grid;align-items:center;text-align:center;font-size:.72rem;font-weight:800;color:var(--muted)}.coord-label{display:grid;place-items:center;min-width:0;overflow:hidden}.board-wrap{grid-column:2;grid-row:1;position:relative;width:100%;margin:0;border-radius:12px;overflow:hidden;background:#ddd;box-shadow:0 0 0 2px #222}.board-wrap::before{content:"";display:block;padding-top:100%}
+.board{position:absolute;top:0;right:0;bottom:0;left:0;display:grid;width:100%;height:100%;min-width:0;min-height:0;user-select:none;-webkit-user-select:none;touch-action:none}
+.cell{appearance:none;-webkit-appearance:none;position:relative;width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;border:0 solid rgba(15,15,15,.72);display:block;padding:0;margin:0;background-color:#fff;background-color:var(--cell);border-radius:0;outline:none;line-height:1}
+.cell::after{content:"";position:absolute;top:8%;right:8%;bottom:8%;left:8%;border-radius:8px;pointer-events:none}.cell:focus-visible::after{box-shadow:inset 0 0 0 3px var(--accent)}
+.cell .mark{position:absolute;z-index:5;top:0;right:0;bottom:0;left:0;display:grid;place-items:center;overflow:hidden;font-size:min(42px,calc(58vmin / var(--n)));font-weight:900;line-height:1;text-shadow:0 1px 0 rgba(255,255,255,.45);pointer-events:none}
+.cell:active{transform:none}.cell.queen .mark{top:50%;left:50%;right:auto;bottom:auto;width:auto;height:auto;display:block;overflow:visible;text-align:center;transform:translate(-50%,-50%);line-height:1}
+.cell.x .mark{font-size:0;opacity:.78;text-shadow:none}.cell.x .mark::before,.cell.x .mark::after{content:"";position:absolute;left:18%;top:calc(50% - 2px);width:64%;height:clamp(2px,.32em,4px);border-radius:999px;background:currentColor;transform-origin:center}.cell.x .mark::before{transform:rotate(45deg)}.cell.x .mark::after{transform:rotate(-45deg)}
+.cell.conflict::after{background:repeating-linear-gradient(135deg,rgba(180,35,24,.20) 0 6px,rgba(180,35,24,.42) 6px 11px);box-shadow:inset 0 0 0 3px var(--danger)}
+.cell.hint-area::before,.cell.hint-target::before{content:"";position:absolute;z-index:4;pointer-events:none;border-radius:8px}
+.cell.hint-area::before{inset:7%;border:2px solid rgba(10,102,194,.72);background:rgba(255,255,255,.12)}
+.cell.hint-target::before{inset:13%;border:3px solid var(--accent);background:rgba(10,102,194,.16);box-shadow:0 0 0 3px rgba(255,255,255,.70),0 0 0 6px rgba(10,102,194,.24);animation:hintPulse 1.15s ease-in-out infinite alternate}
+.cell.hint-problem::before{border-color:var(--danger);background:rgba(180,35,24,.18);box-shadow:0 0 0 3px rgba(255,255,255,.72),0 0 0 6px rgba(180,35,24,.24)}
+@keyframes hintPulse{from{transform:scale(.96);opacity:.72}to{transform:scale(1);opacity:1}}
+
+.cell .mock-shade{position:absolute;z-index:3;inset:7%;border-radius:7px;background:rgba(0,0,0,.20);box-shadow:inset 0 0 0 1px rgba(0,0,0,.10);pointer-events:none}.cell .mock-shade.overlap{background:rgba(0,0,0,.28)}
+.cell .mock-mark{position:absolute;z-index:7;left:50%;top:50%;transform:translate(-50%,-50%) scale(.64);font-size:min(42px,calc(58vmin / var(--n)));font-weight:900;line-height:1;color:#174ea6;text-shadow:0 1px 0 rgba(255,255,255,.9);filter:drop-shadow(0 0 4px rgba(23,78,166,.45));pointer-events:none}
+.cell .mock-x-mark{position:absolute;z-index:7;inset:0;color:#174ea6;opacity:.9;pointer-events:none}.cell .mock-x-mark::before,.cell .mock-x-mark::after{content:"";position:absolute;left:25%;top:calc(50% - 1.5px);width:50%;height:clamp(2px,.25em,3px);border-radius:999px;background:currentColor;box-shadow:0 0 0 1px rgba(255,255,255,.65);transform-origin:center}.cell .mock-x-mark::before{transform:rotate(45deg)}.cell .mock-x-mark::after{transform:rotate(-45deg)}
+.cell .mock-count{position:absolute;z-index:8;right:7%;top:7%;min-width:1.4em;height:1.4em;padding:0 .24em;display:grid;place-items:center;border-radius:999px;background:#174ea6;color:#fff;border:2px solid rgba(255,255,255,.92);box-shadow:0 1px 5px rgba(0,0,0,.25);font-size:min(16px,calc(25vmin / var(--n)));font-weight:900;line-height:1;pointer-events:none}
+.cell.mock-queen::after,.cell.mock-x::after{box-shadow:inset 0 0 0 2px rgba(23,78,166,.72)}
+.mock-tools{display:grid;grid-template-columns:minmax(145px,1fr) auto;gap:8px;align-items:center;margin:8px 0 2px}.mock-tools button{border-radius:10px;padding:.67rem .8rem}.mock-tools .mock-toggle{background:#f3f6fb;border-color:#a9bfdf;color:#17406f}.mock-tools .mock-toggle.active{background:#174ea6;border-color:#174ea6;color:#fff;box-shadow:0 0 0 3px rgba(23,78,166,.16)}.mock-tools .mock-help{grid-column:1/-1;color:var(--muted);font-size:.8rem;line-height:1.25;min-height:1.25em}.mock-tools .mock-help.active{color:#17406f;font-weight:700}
+.mock-legend{display:inline-block;transform:scale(.72);color:#174ea6}
+
+.cell.idle-forced::before{content:"";position:absolute;z-index:5;inset:13%;border-radius:9px;pointer-events:none;border:3px solid rgba(255,255,255,.96);box-shadow:0 0 0 4px rgba(10,102,194,.82),0 0 18px 5px rgba(10,102,194,.45);animation:forcedTileFlash .9s ease-in-out infinite}
+@keyframes forcedTileFlash{0%,100%{transform:scale(.84);opacity:.12}45%{transform:scale(1);opacity:1}}
+.cell.simulated-queen .mark{color:var(--accent);filter:drop-shadow(0 1px 0 #fff) drop-shadow(0 0 5px rgba(10,102,194,.55));animation:simQueenPop .34s ease-out}
+.cell.simulated-x{color:var(--accent)}
+.cell.simulated-x .mark{opacity:.95}
+.cell.hint-problem .mark,.cell.simulated-queen.hint-problem .mark{color:var(--danger);filter:drop-shadow(0 1px 0 #fff) drop-shadow(0 0 5px rgba(180,35,24,.55))}
+@keyframes simQueenPop{from{transform:translate(-50%,-50%) scale(.45);opacity:.2}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+.status.hint ol{margin:.15rem 0 .35rem;padding-left:1.7rem;width:100%}.status.hint li{padding:.18rem .35rem;border-radius:6px;opacity:.48;transition:.2s}.status.hint li.done{opacity:.78}.status.hint li.active{opacity:1;background:#dcecff;color:#123f6b;font-weight:800;box-shadow:inset 3px 0 0 var(--accent)}.status.hint .hint-footer{margin-top:.25rem;font-weight:750;color:#23415f}
+.generating{position:absolute;top:0;right:0;bottom:0;left:0;z-index:10;display:none;place-items:center;background:rgba(255,255,255,.88);font-weight:800;text-align:center;padding:20px}.generating.show{display:grid}.spinner{width:32px;height:32px;border:4px solid #cfd8e3;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px}@keyframes spin{to{transform:rotate(360deg)}}
+.status{min-height:3.25em;margin:12px 0 4px;padding:8px;text-align:center;color:var(--muted);font-size:.91rem;line-height:1.4;display:grid;place-items:center}.status.ok{color:var(--ok);font-weight:800}.status.bad{color:var(--danger);font-weight:800}.status.hint{color:#23415f;background:#f2f7fc;border:1px solid #c8dff5;border-radius:10px;white-space:pre-line;text-align:left;place-items:start}
+.actions{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}.actions button{padding:.65rem .3rem;border-radius:10px;font-size:.88rem}
+.side{padding:18px}.side h2{font-size:1rem;margin:0 0 10px}.rules{margin:0;padding-left:1.25rem;color:#3b4146;line-height:1.5}.rules li+li{margin-top:5px}.legend{display:flex;gap:16px;margin:16px 0;color:var(--muted);font-size:.88rem}.legend b{color:var(--ink);font-size:1.1rem}
+.settings{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}.setting{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0}.setting label{font-weight:650}.setting small{display:block;color:var(--muted);font-weight:400;margin-top:2px}.switch{appearance:none;width:44px;height:26px;border-radius:999px;background:#aeb4b9;position:relative;cursor:pointer;flex:0 0 auto}.switch::after{content:"";position:absolute;width:20px;height:20px;top:3px;left:3px;border-radius:50%;background:#fff;transition:.18s}.switch:checked{background:var(--accent)}.switch:checked::after{left:21px}.meta{margin-top:14px}.badge{display:inline-block;padding:3px 8px;border-radius:999px;background:#e7f6ec;color:#075d34;font-size:.78rem;font-weight:800}
+.win{position:fixed;top:0;right:0;bottom:0;left:0;display:none;place-items:center;background:rgba(0,0,0,.45);z-index:30;padding:18px}.win.show{display:grid}.win-card{width:min(92vw,390px);background:#fff;border-radius:20px;padding:26px;text-align:center;box-shadow:var(--shadow)}.win-crown{font-size:4.2rem}.win h2{margin:.2rem 0}.win p{color:var(--muted)}.win .row{display:flex;gap:8px;justify-content:center;margin-top:16px}
+@media(max-width:760px){body{padding:8px}.app{grid-template-columns:1fr;gap:10px}.side{box-shadow:none}.main,.side{border-radius:14px}.actions{grid-template-columns:repeat(2,1fr)}.mock-tools{grid-template-columns:1fr auto}.board-shell{width:100%;grid-template-columns:20px minmax(0,1fr);grid-template-rows:auto 20px}.col-labels,.row-labels{font-size:.62rem}.board-wrap{width:100%;min-width:0;min-height:0}.subtitle{display:none}.size-control{grid-template-columns:auto minmax(72px,95px) auto}.size-help{grid-column:1/-1}}
+@media(max-width:360px){.topbar{align-items:flex-start}.main{padding:10px}.size-control{gap:6px}.size-control button{padding:.65rem .55rem}}
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="card main">
+    <div class="topbar"><div class="title"><div class="logo">♛</div><div><h1>Queens</h1><div class="subtitle">Choose any board size; larger boards use more varied layouts</div></div></div><div class="timer" id="timer">00:00</div></div>
+    <div class="size-control"><label for="boardSize">Board size</label><input id="boardSize" type="number" min="4" max="25" step="1" value="5" inputmode="numeric"><button id="applySize">Start</button><span class="size-help" id="sizeHelp">Choose any whole size from 4 to 25.</span></div>
+    <div class="board-shell"><div class="col-labels" id="colLabels" aria-hidden="true"></div><div class="row-labels" id="rowLabels" aria-hidden="true"></div><div class="board-wrap"><div class="board" id="board" role="grid" aria-label="Queens board"></div><div class="generating" id="generating"><div><div class="spinner"></div>Generating a unique logic puzzle…</div></div></div></div>
+    <div class="status" id="status" aria-live="polite">Click: empty → × → queen. Drag across cells to paint X marks.</div>
+    <div class="mock-tools"><button class="mock-toggle" id="mockMode" type="button" aria-pressed="false">Mock mode: Off</button><button id="clearMocks" type="button" disabled>Clear mocks</button><div class="mock-help" id="mockHelp">Turn on Mock mode: tap cycles mock × → mock queen; drag paints mock X's.</div></div>
+    <div class="actions"><button id="undo">Undo</button><button id="clear">Clear</button><button id="mistakes">Show mistakes</button><button id="hint">Rule out tile (3)</button><button class="primary" id="newGame">New game</button></div>
+  </main>
+  <aside class="card side"><h2>Rules</h2><ol class="rules"><li>Place exactly one queen in every row.</li><li>Place exactly one queen in every column.</li><li>Place exactly one queen in every colored region.</li><li>Queens cannot touch, including diagonally.</li></ol><div class="legend"><span><b>×</b> impossible</span><span><b>♛</b> queen</span><span><b class="mock-legend">×/♛</b> mock</span></div><div class="settings"><h2>Settings</h2><div class="setting"><label for="autoCheck">Auto-check<small>Highlight rule violations</small></label><input class="switch" id="autoCheck" type="checkbox" checked></div><div class="setting"><label for="autoXs">Auto-place X's<small>Mark cells blocked by queens</small></label><input class="switch" id="autoXs" type="checkbox" checked></div></div><div class="meta"><span class="badge">No guessing required</span></div></aside>
+</div>
+<div class="win" id="win"><div class="win-card"><div class="win-crown">♛</div><h2>Puzzle solved</h2><p id="winText"></p><div class="row"><button id="closeWin">View board</button><button class="primary" id="winNew">New game</button></div></div></div>
+<script>
+(function(){
+'use strict';
+var MIN_SIZE=4,MAX_SIZE=25,MAX_GENERATED_BASE=9;
+var $=function(s){return document.querySelector(s)};
+var boardEl=$('#board'),colLabelsEl=$('#colLabels'),rowLabelsEl=$('#rowLabels'),statusEl=$('#status'),genEl=$('#generating'),timerEl=$('#timer'),sizeInput=$('#boardSize');
+var n=5,regions=[],solution=[],regionColors=[],cells=[],history=[],moves=0,startedAt=0,timerId=null,solved=false,generationToken=0,dragState=null,hintsLeft=3,hintHistory=[],hintFocus=null,hintVisual=null,recentSolutionFamilies={},IDLE_HINT_MS=30000,idleHintTimer=null,idleFlashTimer=null,idleForcedTiles=[],lastValidMarkAt=0,hintPlaybackTimer=null,hintPlaybackToken=0,mockMode=false,mockQueens=new Set(),mockXs=new Set(),mockClearOnNextPress=false,mockClearTimer=null;
+function randInt(max){return Math.floor(Math.random()*max)}
+function shuffle(a){for(var i=a.length-1;i>0;i--){var j=randInt(i+1),t=a[i];a[i]=a[j];a[j]=t}return a}
+function fmtTime(ms){var s=Math.max(0,Math.floor(ms/1000)),m=Math.floor(s/60);return String(m).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+function startTimer(){clearInterval(timerId);startedAt=Date.now();timerEl.textContent='00:00';timerId=setInterval(function(){if(!solved)timerEl.textContent=fmtTime(Date.now()-startedAt)},500)}
+function setStatus(text,type){statusEl.textContent=text;statusEl.className='status'+(type?' '+type:'')}
+function baseConfig(size){return{maxAttempts:size<=5?55:size===6?75:size===7?100:size===8?135:190,preferSingleton:size<=5,minRegion:size>=8?2:1}}
+var COLORS=[[5,85,72],[215,88,72],[125,66,67],[48,96,68],[282,76,75],[185,82,65],[330,84,75],[90,74,68],[25,94,70],[245,80,78],[160,74,64],[60,94,72],[350,76,62],[205,80,60],[110,56,78],[40,86,82],[295,64,62],[175,66,80],[320,66,65],[80,66,80],[15,78,82],[230,66,62],[145,60,80],[55,78,58],[270,60,82],[195,70,78],[340,66,84],[100,58,58],[30,70,58],[255,58,62]];
+function colorDistance(a,b){var dh=Math.abs(a[0]-b[0]);dh=Math.min(dh,360-dh)/180;return dh*3+Math.abs(a[1]-b[1])/34+Math.abs(a[2]-b[2])/18}
+function makePalette(count,map,size){var adjacency=Array.from({length:count},function(){return new Set()});for(var r=0;r<size;r++)for(var c=0;c<size;c++){var i=r*size+c,id=map[i];if(c+1<size&&map[i+1]!==id){adjacency[id].add(map[i+1]);adjacency[map[i+1]].add(id)}if(r+1<size&&map[i+size]!==id){adjacency[id].add(map[i+size]);adjacency[map[i+size]].add(id)}}var order=Array.from({length:count},function(_,i){return i}).sort(function(a,b){return adjacency[b].size-adjacency[a].size||a-b}),assigned=Array(count).fill(-1),used=new Set(),limit=size>11?COLORS.length:Math.min(12,COLORS.length);for(var oi=0;oi<order.length;oi++){var rid=order[oi],best=-1,bestScore=-Infinity;for(var ci=0;ci<limit;ci++){if(used.has(ci))continue;var ns=Array.from(adjacency[rid]).map(function(x){return assigned[x]}).filter(function(x){return x>=0});var sep=ns.length?Math.min.apply(null,ns.map(function(x){return colorDistance(COLORS[ci],COLORS[x])})):5;var all=assigned.filter(function(x){return x>=0});var spread=all.length?Math.min.apply(null,all.map(function(x){return colorDistance(COLORS[ci],COLORS[x])})):2;var score=sep*4+spread;if(score>bestScore){bestScore=score;best=ci}}if(best<0){for(ci=0;ci<COLORS.length;ci++)if(!used.has(ci)){best=ci;break}}assigned[rid]=best;used.add(best)}return assigned.map(function(ci){var c=COLORS[ci];return 'hsl('+c[0]+', '+c[1]+'%, '+c[2]+'%)'})}
+function makeSolution(size){var used=Array(size).fill(false),out=[];function dfs(r){var opts=shuffle(Array.from({length:size},function(_,i){return i}));for(var k=0;k<opts.length;k++){var c=opts[k];if(used[c]||(r>0&&Math.abs(c-out[r-1])===1))continue;used[c]=true;out[r]=c;if(r===size-1||dfs(r+1))return true;used[c]=false}return false}return dfs(0)?out.slice():null}
+function solvePuzzle(map,size,limit){
+  limit=limit||2;
+  if(!Array.isArray(map)||map.length!==size*size)return{count:0,solution:null};
+  var count=0,first=null,assigned=Array(size).fill(-1),regionTiles=Array.from({length:size},function(){return[]});
+  for(var r=0;r<size;r++)for(var c=0;c<size;c++){var rid=map[r*size+c];if(!Number.isInteger(rid)||rid<0||rid>=size)return{count:0,solution:null};regionTiles[rid].push([r,c])}
+  for(r=0;r<size;r++)if(!regionTiles[r].length)return{count:0,solution:null};
+  function legal(r,c,usedCols,usedRegions){var rid=map[r*size+c],cb=1<<c,rb=1<<rid;if(assigned[r]>=0||(usedCols&cb)||(usedRegions&rb))return false;if(r>0&&assigned[r-1]>=0&&Math.abs(c-assigned[r-1])<=1)return false;if(r<size-1&&assigned[r+1]>=0&&Math.abs(c-assigned[r+1])<=1)return false;return true}
+  function dfs(depth,usedCols,usedRegions){
+    if(count>=limit)return;
+    if(depth===size){count++;if(!first)first=assigned.slice();return}
+    var best=null,list,i,p,r,c,rid;
+    function consider(candidate){if(!candidate.length)return false;if(best===null||candidate.length<best.length)best=candidate;return true}
+    for(r=0;r<size;r++)if(assigned[r]<0){list=[];for(c=0;c<size;c++)if(legal(r,c,usedCols,usedRegions))list.push([r,c]);if(!consider(list))return;if(best.length===1)break}
+    if(best.length!==1)for(c=0;c<size;c++)if(!(usedCols&(1<<c))){list=[];for(r=0;r<size;r++)if(legal(r,c,usedCols,usedRegions))list.push([r,c]);if(!consider(list))return;if(best.length===1)break}
+    if(best.length!==1)for(rid=0;rid<size;rid++)if(!(usedRegions&(1<<rid))){list=[];for(i=0;i<regionTiles[rid].length;i++){p=regionTiles[rid][i];if(legal(p[0],p[1],usedCols,usedRegions))list.push(p)}if(!consider(list))return;if(best.length===1)break}
+    for(i=0;i<best.length;i++){r=best[i][0];c=best[i][1];rid=map[r*size+c];assigned[r]=c;dfs(depth+1,usedCols|(1<<c),usedRegions|(1<<rid));assigned[r]=-1;if(count>=limit)return}
+  }
+  dfs(0,0,0);return{count:count,solution:first}
+}
+function solveCount(map,size,limit){return solvePuzzle(map,size,limit).count}
+function growUnique(size,sol,conf){var map=Array(size*size).fill(-1),sizes=Array(size).fill(1);for(var r=0;r<size;r++)map[r*size+sol[r]]=r;var frozen=conf.preferSingleton?randInt(size):-1,remaining=size*size-size;while(remaining){var options=[];for(r=0;r<size;r++)for(var c=0;c<size;c++){var i=r*size+c;if(map[i]>=0)continue;var near=new Set();if(r>0&&map[i-size]>=0)near.add(map[i-size]);if(r<size-1&&map[i+size]>=0)near.add(map[i+size]);if(c>0&&map[i-1]>=0)near.add(map[i-1]);if(c<size-1&&map[i+1]>=0)near.add(map[i+1]);Array.from(near).forEach(function(rid){if(rid!==frozen)options.push([i,rid,sizes[rid]])})}if(!options.length)return null;shuffle(options);options.sort(function(a,b){return a[2]-b[2]+(Math.random()-.5)*2.2});var placed=false;for(var o=0;o<options.length;o++){i=options[o][0];var rid=options[o][1];map[i]=rid;if(solveCount(map,size,2)===1){sizes[rid]++;remaining--;placed=true;break}map[i]=-1}if(!placed)return null}if(Math.min.apply(null,sizes)<conf.minRegion)return null;return map}
+var FALLBACK={4:{sol:[1,3,0,2],map:[0,0,0,1,0,1,1,1,2,2,3,3,2,3,3,3]},5:{sol:[4,2,0,3,1],map:[1,1,0,0,0,2,1,1,3,0,2,1,1,3,0,2,4,4,3,0,4,4,3,3,3]},6:{sol:[2,4,0,3,1,5],map:[0,0,0,1,5,5,2,2,0,1,1,5,2,2,3,3,3,5,2,4,4,3,5,5,2,4,4,3,5,5,2,2,5,5,5,5]},7:{sol:[6,2,0,4,1,5,3],map:[1,1,3,3,0,0,0,2,1,1,3,0,0,0,2,1,3,3,0,3,0,2,2,3,3,3,3,0,4,4,3,3,3,5,0,4,4,4,5,5,5,0,6,6,6,6,5,5,5]},8:{sol:[6,0,3,7,5,2,4,1],map:[0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,1,1,2,2,0,0,0,1,1,2,2,2,3,3,3,1,5,2,2,2,4,4,3,7,5,5,5,6,4,4,3,7,7,5,5,6,6,4,3,7,7,5,6,6,6,4,4]},9:{sol:[5,2,4,7,0,8,3,1,6],map:[1,1,1,1,1,0,0,0,0,4,4,1,1,1,0,3,0,0,4,4,1,1,2,2,3,3,3,4,4,6,1,1,2,2,3,3,4,4,6,6,6,2,2,5,5,4,4,6,6,6,2,2,8,5,4,4,6,6,6,2,2,8,8,4,7,7,7,7,7,2,8,8,7,7,7,7,7,7,8,8,8]}};
+function transformPuzzle(data,size){var turns=randInt(4),mirror=Math.random()<.5,newMap=Array(size*size),newSol=Array(size);function tx(r,c){if(mirror)c=size-1-c;for(var k=0;k<turns;k++){var t=r;r=c;c=size-1-t}return[r,c]}for(var r=0;r<size;r++)for(var c=0;c<size;c++){var p=tx(r,c);newMap[p[0]*size+p[1]]=data.map[r*size+c]}for(r=0;r<size;r++){p=tx(r,data.sol[r]);newSol[p[0]]=p[1]}return{map:newMap,sol:newSol,unique:data.unique===true}}
+function insertionCandidates(data,size){var out=[];for(var row=0;row<=size;row++)for(var col=0;col<=size;col++){var up=row>0?(data.sol[row-1]>=col?data.sol[row-1]+1:data.sol[row-1]):-99,down=row<size?(data.sol[row]>=col?data.sol[row]+1:data.sol[row]):-99;if(row>0&&Math.abs(up-col)<=1)continue;if(row<size&&Math.abs(down-col)<=1)continue;out.push({row:row,col:col,edge:(row===0||row===size?1:0)+(col===0||col===size?1:0)})}shuffle(out);out.sort(function(a,b){return a.edge-b.edge+(Math.random()-.5)*.7});return out}
+function buildInsertedPuzzle(data,size,row,col,arms){var next=size+1,map=Array(next*next).fill(-1),sol=Array(next);for(var r=0;r<size;r++)for(var c=0;c<size;c++){var nr=r>=row?r+1:r,nc=c>=col?c+1:c;map[nr*next+nc]=data.map[r*size+c]}for(r=0;r<size;r++){nr=r>=row?r+1:r;sol[nr]=data.sol[r]>=col?data.sol[r]+1:data.sol[r]}sol[row]=col;var lower=Math.random()<.5,run=1+randInt(3);for(c=0;c<next;c++)if(c!==col){if(--run<=0){lower=!lower;run=1+randInt(4)}var oc=c<col?c:c-1,orow=row===0?0:row===size?size-1:(lower?row:row-1);map[row*next+c]=data.map[orow*size+oc]}var right=Math.random()<.5;run=1+randInt(3);for(r=0;r<next;r++)if(r!==row){if(--run<=0){right=!right;run=1+randInt(4)}orow=r<row?r:r-1;oc=col===0?0:col===size?size-1:(right?col:col-1);map[r*next+col]=data.map[orow*size+oc]}map[row*next+col]=size;var around=shuffle([[row-1,col],[row+1,col],[row,col-1],[row,col+1]]).filter(function(p){return p[0]>=0&&p[0]<next&&p[1]>=0&&p[1]<next});for(var a=0;a<arms&&a<around.length;a++)map[around[a][0]*next+around[a][1]]=size;return{map:map,sol:sol}}
+function verifiedInsertedPuzzle(data,size,pick,arms){var expanded=buildInsertedPuzzle(data,size,pick.row,pick.col,arms);return finalUniqueValidation(expanded,size+1)?expanded:null}
+function guaranteedUniqueExtension(data,size){
+  var picks=insertionCandidates(data,size);
+  for(var round=0;round<6;round++)for(var i=0;i<picks.length;i++){var expanded=verifiedInsertedPuzzle(data,size,picks[i],0);if(expanded)return expanded}
+  return null
+}
+function extendPuzzle(data,size){
+  var picks=insertionCandidates(data,size),tries=Math.min(picks.length,size<10?12:size<14?8:4);
+  for(var i=0;i<tries;i++){var pick=picks[i],maxArms=size>=14?1:size>=11?2:4,arms=1+randInt(maxArms),expanded=verifiedInsertedPuzzle(data,size,pick,arms);if(expanded)return expanded}
+  return guaranteedUniqueExtension(data,size)
+}
+function relabelRegions(map,size){var ids=shuffle(Array.from({length:size},function(_,i){return i}));return map.map(function(id){return ids[id]})}
+function solutionFamilySignature(sol,size){var signatures=[];for(var mirror=0;mirror<2;mirror++)for(var turns=0;turns<4;turns++){var transformed=Array(size);for(var r=0;r<size;r++){var rr=r,c=sol[r];if(mirror)c=size-1-c;for(var k=0;k<turns;k++){var t=rr;rr=c;c=size-1-t}transformed[rr]=c}signatures.push(transformed.join(','))}signatures.sort();return signatures[0]}
+function isRecentSolution(size,sol){var list=recentSolutionFamilies[size]||[];return list.indexOf(solutionFamilySignature(sol,size))>=0}
+function rememberSolution(size,sol){var key=solutionFamilySignature(sol,size),list=recentSolutionFamilies[size]||(recentSolutionFamilies[size]=[]);if(list.indexOf(key)<0)list.push(key);if(list.length>18)list.shift()}
+function validSolvedLayout(map,sol,size){if(!sol||sol.length!==size)return false;var cols=new Set(),usedRegions=new Set();for(var r=0;r<size;r++){var c=sol[r];if(!Number.isInteger(c)||c<0||c>=size||cols.has(c))return false;var rid=map[r*size+c];if(rid<0||rid>=size||usedRegions.has(rid))return false;if(r>0&&Math.abs(c-sol[r-1])<=1)return false;cols.add(c);usedRegions.add(rid)}return cols.size===size&&usedRegions.size===size}
+function validRegionMap(map,size){
+  if(!Array.isArray(map)||map.length!==size*size)return false;
+  var counts=Array(size).fill(0),starts=Array(size).fill(-1);
+  for(var i=0;i<map.length;i++){var rid=map[i];if(!Number.isInteger(rid)||rid<0||rid>=size)return false;counts[rid]++;if(starts[rid]<0)starts[rid]=i}
+  for(rid=0;rid<size;rid++){
+    if(!counts[rid])return false;
+    var seen=new Set([starts[rid]]),stack=[starts[rid]];
+    while(stack.length){var at=stack.pop(),r=Math.floor(at/size),c=at%size,near=[];if(r>0)near.push(at-size);if(r<size-1)near.push(at+size);if(c>0)near.push(at-1);if(c<size-1)near.push(at+1);for(var k=0;k<near.length;k++)if(map[near[k]]===rid&&!seen.has(near[k])){seen.add(near[k]);stack.push(near[k])}}
+    if(seen.size!==counts[rid])return false
+  }
+  return true
+}
+function finalUniqueValidation(candidate,size){
+  if(!candidate||!validRegionMap(candidate.map,size))return false;
+  var checked=solvePuzzle(candidate.map,size,2);
+  if(checked.count!==1||!validSolvedLayout(candidate.map,checked.solution,size))return false;
+  candidate.sol=checked.solution;candidate.unique=true;return true
+}
+function buildBasePuzzle(size,conf){for(var attempt=0;attempt<conf.maxAttempts;attempt++){var sol=makeSolution(size);if(!sol)continue;var map=growUnique(size,sol,conf);if(map){var checked=solvePuzzle(map,size,2);if(checked.count===1)return{map:map,sol:checked.solution,unique:true}}}var fallback=FALLBACK[size],candidate=transformPuzzle({map:fallback.map.slice(),sol:fallback.sol.slice()},size),verified=solvePuzzle(candidate.map,size,2);return verified.count===1?{map:candidate.map,sol:verified.solution,unique:true}:null}
+async function generateGame(){
+  stopHintPlayback();cancelIdleHint();clearTimeout(mockClearTimer);mockClearTimer=null;
+  var token=++generationToken,target=n,base=Math.min(target,MAX_GENERATED_BASE),conf=baseConfig(base);solved=false;genEl.classList.add('show');setControls(false);setStatus('Creating and verifying a puzzle with exactly one solution…');await new Promise(function(r){setTimeout(r,30)});
+  var best=null,firstValid=null,boardAttempts=target<=6?10:target<=9?8:6;
+  for(var boardTry=0;boardTry<boardAttempts&&token===generationToken;boardTry++){
+    var candidate=buildBasePuzzle(base,conf);if(!candidate)continue;var current=base,failed=false;
+    while(current<target){candidate=extendPuzzle(candidate,current);if(!candidate){failed=true;break}current++}
+    if(failed)continue;candidate=transformPuzzle(candidate,target);candidate.map=relabelRegions(candidate.map,target);if(!finalUniqueValidation(candidate,target))continue;
+    if(!firstValid)firstValid=candidate;if(!isRecentSolution(target,candidate.sol)){best=candidate;break}if(boardTry%2===1)await new Promise(function(r){setTimeout(r,0)})
+  }
+  if(token!==generationToken)return;best=best||firstValid;
+  if(!best){
+    var fb=FALLBACK[base],emergency=transformPuzzle({map:fb.map.slice(),sol:fb.sol.slice(),unique:true},base),emergencySize=base;
+    if(!finalUniqueValidation(emergency,base))emergency=null;
+    while(emergency&&emergencySize<target){emergency=guaranteedUniqueExtension(emergency,emergencySize);emergencySize++}
+    if(emergency){emergency=transformPuzzle(emergency,target);emergency.map=relabelRegions(emergency.map,target);if(finalUniqueValidation(emergency,target))best=emergency}
+  }
+  if(best&&!finalUniqueValidation(best,target))best=null;
+  if(!best){setStatus('Verification failed before display. Retrying automatically; no unverified board will be shown.');setTimeout(function(){if(token===generationToken)generateGame()},80);return}
+  rememberSolution(target,best.sol);regions=best.map;solution=best.sol;regionColors=makePalette(target,regions,target);cells=Array(target*target).fill(0);history=[];moves=0;hintsLeft=3;hintHistory=[];hintFocus=null;hintVisual=null;mockQueens.clear();mockXs.clear();mockClearOnNextPress=false;renderBoard();genEl.classList.remove('show');setControls(true);setStatus('Verified: this board has exactly one valid queen arrangement.');startTimer();resetIdleHint()
+}
+function borderStyle(i){var r=Math.floor(i/n),c=i%n,id=regions[i];return{top:r===0?2.5:(regions[i-n]!==id?2.5:.4),right:c===n-1?2.5:(regions[i+1]!==id?2.5:.4),bottom:r===n-1?2.5:(regions[i+n]!==id?2.5:.4),left:c===0?2.5:(regions[i-1]!==id?2.5:.4)}}
+function autoBlockedSet(){var out=new Set(),queens=[];cells.forEach(function(v,i){if(v===2)queens.push(i)});for(var q=0;q<queens.length;q++){var qi=queens[q],qr=Math.floor(qi/n),qc=qi%n,rid=regions[qi];for(var i=0;i<n*n;i++){if(i===qi||cells[i]===2)continue;var r=Math.floor(i/n),c=i%n;if(r===qr||c===qc||regions[i]===rid||(Math.abs(r-qr)<=1&&Math.abs(c-qc)<=1))out.add(i)}}return out}
+function conflictSet(force){var bad=new Set();if(!force&&!$('#autoCheck').checked)return bad;var qs=[];cells.forEach(function(v,i){if(v===2)qs.push(i)});for(var a=0;a<qs.length;a++)for(var b=a+1;b<qs.length;b++){var i=qs[a],j=qs[b],r1=Math.floor(i/n),c1=i%n,r2=Math.floor(j/n),c2=j%n;if(r1===r2||c1===c2||regions[i]===regions[j]||(Math.abs(r1-r2)<=1&&Math.abs(c1-c2)<=1)){bad.add(i);bad.add(j)}}return bad}
+function columnName(c){return String.fromCharCode(65+c)}
+function rowNumber(r){return n-r}
+function mockAffectedTiles(q){
+  var out=[],qr=Math.floor(q/n),qc=q%n,rid=regions[q];
+  for(var i=0;i<n*n;i++)if(i!==q){var r=Math.floor(i/n),c=i%n;if(r===qr||c===qc||regions[i]===rid||(Math.abs(r-qr)<=1&&Math.abs(c-qc)<=1))out.push(i)}
+  return out
+}
+function mockInfluenceData(){
+  var sources=Array.from({length:n*n},function(){return new Set()});
+  mockQueens.forEach(function(q){mockAffectedTiles(q).forEach(function(tile){sources[tile].add(q)})});
+  return{counts:sources.map(function(set){return set.size})}
+}
+function mockMarkCount(){return mockQueens.size+mockXs.size}
+function updateMockControls(){
+  var button=$('#mockMode'),help=$('#mockHelp'),count=mockMarkCount();button.textContent='Mock mode: '+(mockMode?'On':'Off');button.classList.toggle('active',mockMode);button.setAttribute('aria-pressed',String(mockMode));$('#clearMocks').disabled=!count||solved;help.classList.toggle('active',mockMode);help.textContent=mockMode?'Mock mode is on: tap cycles mock × → mock queen → empty. Drag paints mock X marks. Black squares show mock-queen blocking; numbers show overlaps.':mockClearOnNextPress?'Mock queens and X marks are frozen for inspection and will disappear on your next press.':'Turn on Mock mode: tap cycles mock × → mock queen; drag paints mock X marks.'
+}
+function setMockMode(on){
+  mockMode=!!on;mockClearOnNextPress=!mockMode&&mockMarkCount()>0;clearHintVisual();updateMockControls();renderBoard();setStatus(mockMode?'Mock mode on. Tap: empty → mock × → mock queen. Drag to paint mock X marks.':mockClearOnNextPress?'Mock mode off. All mock marks remain visible until your next press.':'Mock mode off.')
+}
+function cycleMockCell(i,reverse){
+  if(solved)return;clearHintVisual();var hasQ=mockQueens.has(i),hasX=mockXs.has(i);
+  if(reverse){if(hasX){mockXs.delete(i)}else if(hasQ){mockQueens.delete(i);mockXs.add(i)}else if(cells[i]!==2){mockQueens.add(i)}}
+  else{if(hasQ){mockQueens.delete(i)}else if(hasX){mockXs.delete(i);if(cells[i]!==2)mockQueens.add(i)}else mockXs.add(i)}
+  renderBoard();setStatus(mockQueens.size+' mock queen'+(mockQueens.size===1?'':'s')+' and '+mockXs.size+' mock X'+(mockXs.size===1?'':'s')+'. Black squares show tiles blocked by mock queens.')
+}
+function toggleMockQueen(i){if(mockQueens.has(i)){mockQueens.delete(i)}else if(cells[i]!==2){mockXs.delete(i);mockQueens.add(i)}renderBoard();updateMockControls()}
+function paintMockXs(indices){
+  var changed=false;indices.forEach(function(i){if(i>=0&&!mockXs.has(i)){mockQueens.delete(i);mockXs.add(i);changed=true}});if(changed)renderBoard();return changed
+}
+function clearMockQueens(showStatus){
+  clearTimeout(mockClearTimer);mockClearTimer=null;mockClearOnNextPress=false;if(!mockMarkCount()){updateMockControls();return}mockQueens.clear();mockXs.clear();renderBoard();if(showStatus!==false)setStatus('Mock queens and X marks cleared.')
+}
+function clearHeldMocksOnPress(){
+  if(mockMode||!mockClearOnNextPress)return false;mockClearOnNextPress=false;updateMockControls();clearTimeout(mockClearTimer);mockClearTimer=setTimeout(function(){mockClearTimer=null;if(!mockMarkCount()){updateMockControls();return}mockQueens.clear();mockXs.clear();renderBoard();setStatus('Mock queens and X marks cleared.')},0);return true
+}
+function renderBoard(){
+  boardEl.style.gridTemplateColumns='repeat('+n+',minmax(0,1fr))';boardEl.style.gridTemplateRows='repeat('+n+',minmax(0,1fr))';boardEl.style.setProperty('--n',n);colLabelsEl.style.gridTemplateColumns='repeat('+n+',minmax(0,1fr))';rowLabelsEl.style.gridTemplateRows='repeat('+n+',minmax(0,1fr))';colLabelsEl.innerHTML='';rowLabelsEl.innerHTML='';
+  for(var label=0;label<n;label++){var col=document.createElement('span');col.className='coord-label';col.textContent=columnName(label);colLabelsEl.appendChild(col);var row=document.createElement('span');row.className='coord-label';row.textContent=String(rowNumber(label));rowLabelsEl.appendChild(row)}
+  boardEl.innerHTML='';
+  var auto=autoBlockedSet(),bad=conflictSet(false),hintArea=new Set(hintVisual&&hintVisual.area||[]),hintTargets=new Set(hintVisual&&hintVisual.targets||[]),hintProblem=!!(hintVisual&&hintVisual.problem),problemTiles=new Set(hintVisual&&hintVisual.problemTiles||[]),simQueens=new Set(hintVisual&&hintVisual.simQueens||[]),simXs=new Set(hintVisual&&hintVisual.simXs||[]),idleForced=new Set(idleForcedTiles),mockData=mockInfluenceData();
+  for(var i=0;i<n*n;i++){
+    var b=borderStyle(i),base=cells[i],simQueen=base!==2&&simQueens.has(i),simX=base===0&&!simQueen&&simXs.has(i),effective=base===0&&$('#autoXs').checked&&auto.has(i)?1:base,xShown=!simQueen&&(effective===1||simX),isProblem=problemTiles.has(i)||(hintProblem&&hintTargets.has(i)),btn=document.createElement('button');
+    btn.className='cell'+(xShown?' x':'')+(simX?' simulated-x':'')+(base===2?' queen':'')+(simQueen?' queen simulated-queen':'')+(bad.has(i)?' conflict':'')+(hintArea.has(i)?' hint-area':'')+((hintTargets.has(i)||problemTiles.has(i))?' hint-target':'')+(isProblem?' hint-problem':'')+(idleForced.has(i)&&base===0?' idle-forced':'')+(mockQueens.has(i)?' mock-queen':'')+(mockXs.has(i)?' mock-x':'');
+    btn.style.setProperty('--cell',regionColors[regions[i]]);btn.style.borderTopWidth=b.top+'px';btn.style.borderRightWidth=b.right+'px';btn.style.borderBottomWidth=b.bottom+'px';btn.style.borderLeftWidth=b.left+'px';btn.dataset.i=i;btn.setAttribute('aria-label',squareName(i));btn.innerHTML='<span class="mark">'+(base===2||simQueen?'♛':'')+'</span>'+(mockData.counts[i]>0?'<span class="mock-shade'+(mockData.counts[i]>=2?' overlap':'')+'"></span>':'')+(mockQueens.has(i)?'<span class="mock-mark">♛</span>':'')+(mockXs.has(i)?'<span class="mock-x-mark"></span>':'')+(mockData.counts[i]>=2?'<span class="mock-count">'+mockData.counts[i]+'</span>':'');boardEl.appendChild(btn)
+  }
+  updateButtons();updateMockControls()
+}
+function pushHistory(){history.push(cells.slice());if(history.length>200)history.shift()}
+function stopHintPlayback(){hintPlaybackToken++;clearTimeout(hintPlaybackTimer);hintPlaybackTimer=null}
+function clearHintVisual(){stopHintPlayback();hintVisual=null}
+function placedMarkIsValid(i){var r=Math.floor(i/n),isSolutionTile=solution[r]===i%n;if(cells[i]===1)return!isSolutionTile;if(cells[i]===2)return isSolutionTile;return false}
+function cycleCell(i,isAuto,reverse){if(solved)return;clearHintVisual();pushHistory();var effective=cells[i]===0&&isAuto?1:cells[i];cells[i]=reverse?(effective===0?2:effective===2?1:0):(effective===0?1:effective===1?2:0);moves++;if(placedMarkIsValid(i))resetIdleHint();else resumeIdleHint();renderBoard();checkProgress()}
+function checkProgress(){var bad=conflictSet(false);if(bad.size){setStatus('Two or more queens break a rule.','bad');return}var queens=cells.filter(function(v){return v===2}).length;if(queens===n){var valid=solution.every(function(c,r){return cells[r*n+c]===2});if(valid){solved=true;clearHintVisual();cancelIdleHint();clearInterval(timerId);setStatus('Solved without guessing.','ok');renderBoard();$('#winText').textContent=n+'×'+n+' · '+timerEl.textContent+' · '+moves+' moves';$('#win').classList.add('show')}else setStatus('The board is full, but at least one queen is misplaced.','bad')}else setStatus(queens+' of '+n+' queens placed.')}
+function updateButtons(){var hasMarks=cells.some(function(v){return v!==0});$('#undo').disabled=!history.length||solved;$('#clear').disabled=(!hasMarks&&!mockMarkCount())||solved;$('#mistakes').disabled=!hasMarks||solved;$('#hint').disabled=solved||hintsLeft<=0;$('#hint').textContent='Rule out tile ('+hintsLeft+')'}
+function setControls(on){document.querySelectorAll('.actions button,.mock-tools button,.size-control button,.size-control input').forEach(function(el){el.disabled=!on})}
+function undo(){if(!history.length||solved)return;clearHintVisual();cells=history.pop();moves++;resetIdleHint();renderBoard();checkProgress()}
+function clearBoard(){var hasReal=cells.some(function(v){return v!==0});if((!hasReal&&!mockMarkCount())||solved)return;clearHintVisual();if(hasReal){pushHistory();cells.fill(0);moves++;resetIdleHint()}mockQueens.clear();mockXs.clear();mockClearOnNextPress=false;renderBoard();setStatus('Board cleared.')}
+function playableCells(){var blocked=autoBlockedSet(),out=[];for(var i=0;i<n*n;i++)if(cells[i]===0&&!blocked.has(i))out.push(i);return out}
+function unitHasQueen(type,index){for(var i=0;i<n*n;i++)if(cells[i]===2){var r=Math.floor(i/n),c=i%n;if(type==='row'&&r===index||type==='col'&&c===index||type==='region'&&regions[i]===index)return true}return false}
+function unitCandidates(type,index,playable){return playable.filter(function(i){var r=Math.floor(i/n),c=i%n;return type==='row'?r===index:type==='col'?c===index:regions[i]===index})}
+function coordinate(i){return{row:rowNumber(Math.floor(i/n)),col:columnName(i%n)}}
+function unitText(u,stage){
+  var ref=coordinate(u.cells[Math.floor((u.cells.length-1)/2)]);
+  if(stage===0){
+    if(u.type==='row')return'Focus on row '+rowNumber(u.index)+'. Compare its open cells with their colored regions.';
+    if(u.type==='col')return'Focus on column '+columnName(u.index)+'. Compare its open cells with the rows they affect.';
+    return'Focus on the colored region containing the available cell at row '+ref.row+', column '+ref.col+'. Compare its open rows and columns.';
+  }
+  if(stage===1){
+    if(u.count===1){
+      if(u.type==='row')return'Row '+rowNumber(u.index)+' now has one playable cell left. Verify it using both the column and region rules.';
+      if(u.type==='col')return'Column '+columnName(u.index)+' now has one playable cell left. Verify it using both the row and region rules.';
+      return'The colored region containing the available cell at row '+ref.row+', column '+ref.col+' has one playable cell left. Verify its row and column.';
+    }
+    if(u.type==='row')return'Row '+rowNumber(u.index)+' has '+u.count+' playable cells left. Check which colored region creates the tightest restriction.';
+    if(u.type==='col')return'Column '+columnName(u.index)+' has '+u.count+' playable cells left. Check which row loses an option first.';
+    return'The colored region containing the available cell at row '+ref.row+', column '+ref.col+' has '+u.count+' playable cells left. Compare their rows and columns.';
+  }
+  if(u.count===1){
+    if(u.type==='row')return'Row '+rowNumber(u.index)+' is forced, but the exact square still follows from its column and colored region.';
+    if(u.type==='col')return'Column '+columnName(u.index)+' is forced, but the exact square still follows from its row and colored region.';
+    return'The colored region containing the available cell at row '+ref.row+', column '+ref.col+' is forced. Confirm the square from its row and column.';
+  }
+  if(u.count===2){
+    if(u.type==='row')return'Row '+rowNumber(u.index)+' has two playable cells. Test which one would leave another column without a place.';
+    if(u.type==='col')return'Column '+columnName(u.index)+' has two playable cells. Test which one would leave another row without a place.';
+    return'The colored region containing the available cell at row '+ref.row+', column '+ref.col+' has two playable cells. One makes another unit impossible.';
+  }
+  if(u.type==='row')return'Row '+rowNumber(u.index)+' is down to '+u.count+' playable cells. Eliminate the choice that creates a dead end in another column.';
+  if(u.type==='col')return'Column '+columnName(u.index)+' is down to '+u.count+' playable cells. Eliminate the choice that creates a dead end in another row.';
+  return'The colored region containing the available cell at row '+ref.row+', column '+ref.col+' is down to '+u.count+' playable cells. Eliminate the choice that blocks another unit.';
+}
+function unitBoardCells(type,index){var out=[];for(var i=0;i<n*n;i++){var r=Math.floor(i/n),c=i%n;if(type==='row'&&r===index||type==='col'&&c===index||type==='region'&&regions[i]===index)out.push(i)}return out}
+function hintVisualFor(key){
+  var m,type,index,area=[],targets=[],problem=false,playable=playableCells();
+  if((m=/^(row|col|region)-(\d+)$/.exec(key))){
+    type=m[1];index=Number(m[2]);area=unitBoardCells(type,index);targets=unitCandidates(type,index,playable);return{area:area,targets:targets,problem:false};
+  }
+  if((m=/^conflict-(\d+)$/.exec(key))){index=Number(m[1])-1;area=unitBoardCells('row',index);targets=Array.from(conflictSet(true));problem=true;return{area:area,targets:targets,problem:problem}}
+  if((m=/^wrongq-(\d+)$/.exec(key))){index=Number(m[1])-1;area=unitBoardCells('row',index);targets=area.filter(function(i){return cells[i]===2});problem=true;return{area:area,targets:targets,problem:problem}}
+  if((m=/^wrongx-(\d+)$/.exec(key))){index=Number(m[1]);area=unitBoardCells('row',index);targets=area.filter(function(i){return cells[i]===1});problem=true;return{area:area,targets:targets.length?targets:area,problem:problem}}
+  return{area:[],targets:[],problem:false};
+}
+function problemHint(kind,row,stage){
+  if(kind==='conflict'){
+    if(stage===0)return'Recheck the queens involving row '+row+'; one of the four rules is broken.';
+    if(stage===1)return'A queen involving row '+row+' shares a row, column, colored region, or neighboring square with another queen.';
+    return'Move or remove a conflicting queen involving row '+row+' before continuing elsewhere.';
+  }
+  if(kind==='wrongq'){
+    if(stage===0)return'Reconsider the queen in row '+row+'.';
+    if(stage===1)return'Keeping the queen in row '+row+' prevents all remaining rows from being completed.';
+    return'Move the queen in row '+row+' before working on another area.';
+  }
+  if(stage===0)return'Recheck the X marks in row '+row+'.';
+  if(stage===1)return'One X in row '+row+' removes every complete solution.';
+  return'Restore one possible square in row '+row+' before continuing.';
+}
+function buildHint(){
+  var stage=3-hintsLeft,bad=Array.from(conflictSet(true));
+  if(bad.length){var rr=Math.floor(bad[0]/n)+1;hintFocus='conflict-'+rr;return{key:hintFocus,text:problemHint('conflict',rowNumber(rr-1),stage)}}
+  var wrongQ=[];for(var i=0;i<n*n;i++)if(cells[i]===2&&solution[Math.floor(i/n)]!==i%n)wrongQ.push(i);
+  if(wrongQ.length){rr=Math.floor(wrongQ[0]/n)+1;hintFocus='wrongq-'+rr;return{key:hintFocus,text:problemHint('wrongq',rowNumber(rr-1),stage)}}
+  var wrongX=[];for(var r=0;r<n;r++){i=r*n+solution[r];if(cells[i]===1)wrongX.push(r)}
+  if(wrongX.length){r=wrongX[0];hintFocus='wrongx-'+r;return{key:hintFocus,text:problemHint('wrongx',rowNumber(r),stage)}}
+  var playable=playableCells(),units=[],contradictions=[];
+  for(r=0;r<n;r++)if(!unitHasQueen('row',r)){var list=unitCandidates('row',r,playable),u={key:'row-'+r,type:'row',index:r,count:list.length,cells:list};(list.length?units:contradictions).push(u)}
+  for(var c=0;c<n;c++)if(!unitHasQueen('col',c)){list=unitCandidates('col',c,playable);u={key:'col-'+c,type:'col',index:c,count:list.length,cells:list};(list.length?units:contradictions).push(u)}
+  for(var rid=0;rid<n;rid++)if(!unitHasQueen('region',rid)){list=unitCandidates('region',rid,playable);u={key:'region-'+rid,type:'region',index:rid,count:list.length,cells:list};(list.length?units:contradictions).push(u)}
+  if(contradictions.length){
+    u=contradictions.find(function(x){return x.key===hintFocus})||contradictions.find(function(x){return hintHistory.indexOf(x.key)<0})||contradictions[0];hintFocus=u.key;
+    if(u.type==='row')return{key:u.key,text:'Row '+rowNumber(u.index)+' has no playable cell left. Recheck nearby X marks.'};
+    if(u.type==='col')return{key:u.key,text:'Column '+columnName(u.index)+' has no playable cell left. Recheck nearby X marks.'};
+    return{key:u.key,text:'A colored region has no playable cell left. Recheck the X marks around its boundary.'};
+  }
+  var focused=stage>0&&hintFocus?units.find(function(x){return x.key===hintFocus}):null;
+  if(focused)return{key:focused.key,text:unitText(focused,stage)};
+  var fresh=units.filter(function(x){return hintHistory.indexOf(x.key)<0}),pool=fresh.length?fresh:units,preferred;
+  if(stage===0){preferred=pool.filter(function(x){return x.count>=2&&x.count<=5});if(!preferred.length)preferred=pool.filter(function(x){return x.count<=6})}
+  else if(stage===1){preferred=pool.filter(function(x){return x.count>=1&&x.count<=4});if(!preferred.length)preferred=pool.filter(function(x){return x.count<=5})}
+  else preferred=pool.filter(function(x){return x.count<=3});
+  if(!preferred||!preferred.length)preferred=pool;
+  if(!preferred.length)return{key:'general',text:'Compare two unresolved neighboring rows; their queens cannot use adjacent columns.'};
+  preferred.sort(function(a,b){var pa=a.type==='region'?-0.2:0,pb=b.type==='region'?-0.2:0;return a.count+pa-(b.count+pb)});
+  u=preferred[0];hintFocus=u.key;return{key:u.key,text:unitText(u,stage)};
+}
+function queenConflictReason(a,b){
+  var ar=Math.floor(a/n),ac=a%n,br=Math.floor(b/n),bc=b%n;
+  if(ar===br)return'same row';
+  if(ac===bc)return'same column';
+  if(regions[a]===regions[b])return'same colored region';
+  if(Math.abs(ar-br)<=1&&Math.abs(ac-bc)<=1)return'queens cannot touch';
+  return'';
+}
+function currentQueens(){var out=[];for(var i=0;i<n*n;i++)if(cells[i]===2)out.push(i);return out}
+function directBlock(i,queens){
+  for(var q=0;q<queens.length;q++){var why=queenConflictReason(i,queens[q]);if(why)return{queen:queens[q],why:why}}
+  return null;
+}
+function openCandidates(){
+  var queens=currentQueens(),out=[];
+  for(var i=0;i<n*n;i++)if(cells[i]===0&&!directBlock(i,queens))out.push(i);
+  return out;
+}
+function squareName(i){return columnName(i%n)+rowNumber(Math.floor(i/n))}
+function forcedQueenDeductions(open){
+  var forced=[],seen=new Set();
+  function add(type,index,list){if(list.length===1&&!seen.has(list[0])){seen.add(list[0]);forced.push({tile:list[0],type:type,index:index})}}
+  for(var r=0;r<n;r++)if(!unitHasQueen('row',r))add('row',r,unitCandidates('row',r,open));
+  for(var c=0;c<n;c++)if(!unitHasQueen('col',c))add('col',c,unitCandidates('col',c,open));
+  for(var rid=0;rid<n;rid++)if(!unitHasQueen('region',rid))add('region',rid,unitCandidates('region',rid,open));
+  return forced;
+}
+function cancelIdleHint(){clearTimeout(idleHintTimer);clearTimeout(idleFlashTimer);idleHintTimer=null;idleFlashTimer=null;idleForcedTiles=[]}
+function armIdleHint(resetClock){
+  cancelIdleHint();if(solved||!cells.length)return;
+  if(resetClock||!lastValidMarkAt)lastValidMarkAt=Date.now();
+  var delay=Math.max(0,IDLE_HINT_MS-(Date.now()-lastValidMarkAt));
+  idleHintTimer=setTimeout(showIdleForcedFlash,delay)
+}
+function resetIdleHint(){armIdleHint(true)}
+function resumeIdleHint(){armIdleHint(false)}
+function retryIdleForcedCheck(){clearTimeout(idleHintTimer);if(!solved)idleHintTimer=setTimeout(showIdleForcedFlash,1000)}
+function showIdleForcedFlash(){
+  idleHintTimer=null;
+  if(solved)return;
+  if(hintPlaybackTimer||hintVisual||conflictSet(true).size){retryIdleForcedCheck();return}
+  var forced=forcedQueenDeductions(openCandidates());
+  if(!forced.length){retryIdleForcedCheck();return}
+  idleForcedTiles=forced.map(function(f){return f.tile});renderBoard()
+}
+function forcedReason(f){
+  var where=squareName(f.tile);
+  if(f.type==='row')return'Row '+rowNumber(f.index)+' has only one possible queen tile ('+where+')';
+  if(f.type==='col')return'Column '+columnName(f.index)+' has only one possible queen tile ('+where+')';
+  return'The colored region has only one possible queen tile ('+where+')';
+}
+function blockReasonText(block){
+  var where=squareName(block.queen);
+  if(block.why==='same row')return'A queen at '+where+' already uses this row.';
+  if(block.why==='same column')return'A queen at '+where+' already uses this column.';
+  if(block.why==='same colored region')return'A queen at '+where+' already uses this colored region.';
+  return'A queen at '+where+' would touch this tile.';
+}
+function unitLabel(type,index,reference){
+  if(type==='row')return'Row '+rowNumber(index);
+  if(type==='col')return'Column '+columnName(index);
+  return'The colored region containing '+squareName(reference!=null?reference:unitBoardCells('region',index)[0]);
+}
+function ruleText(why,a,b){
+  if(why==='same row')return squareName(a)+' and '+squareName(b)+' would place two queens in row '+rowNumber(Math.floor(a/n))+'.';
+  if(why==='same column')return squareName(a)+' and '+squareName(b)+' would place two queens in column '+columnName(a%n)+'.';
+  if(why==='same colored region')return squareName(a)+' and '+squareName(b)+' would place two queens in the same colored region.';
+  return squareName(a)+' would touch '+squareName(b)+'.';
+}
+function logicalProofForTile(extraQueen){
+  var queens=new Set(),eliminated=new Set(),reasons=new Map(),steps=[],events=[],baseQueens=new Set(),baseXs=new Set(),maxSteps=Math.max(12,n*2);
+  for(var seed=0;seed<n*n;seed++){if(cells[seed]===2)baseQueens.add(seed);if(cells[seed]===1)baseXs.add(seed)}
+  function recordElimination(i,text){if(!queens.has(i)&&!eliminated.has(i)){eliminated.add(i);reasons.set(i,text);return true}return false}
+  function unique(list){return Array.from(new Set(list||[]))}
+  function snapshot(text,opt){
+    opt=opt||{};steps.push(text);
+    var simulated=Array.from(queens).filter(function(q){return!baseQueens.has(q)}).concat(opt.extraQueens||[]),shownXs=Array.from(eliminated).filter(function(x){return!baseXs.has(x)&&!queens.has(x)});
+    events.push({text:text,simQueens:unique(simulated),simXs:unique(shownXs),targets:unique(opt.targets||[]),problemTiles:unique(opt.problemTiles||[]),area:unique(opt.area||[])})
+  }
+  function addQueen(i){
+    if(queens.has(i))return null;
+    var existing=Array.from(queens).sort(function(a,b){return a-b});
+    for(var q=0;q<existing.length;q++){var why=queenConflictReason(i,existing[q]);if(why)return{contradiction:ruleText(why,i,existing[q]),problemTiles:[i,existing[q]]}}
+    if(eliminated.has(i))return{contradiction:squareName(i)+' is unavailable: '+reasons.get(i)+'.',problemTiles:[i]};
+    queens.add(i);
+    for(var t=0;t<n*n;t++)if(t!==i){var why2=queenConflictReason(t,i);if(why2)recordElimination(t,'blocked by queen at '+squareName(i)+' ('+why2+')')}
+    return null
+  }
+  for(var i=0;i<n*n;i++)if(cells[i]===1)recordElimination(i,'marked X');
+  for(i=0;i<n*n;i++)if(cells[i]===2){var seeded=addQueen(i);if(seeded)return{baselineInvalid:true,text:'The current board already contains a contradiction: '+seeded.contradiction}}
+  if(extraQueen>=0){
+    var assumed=addQueen(extraQueen);snapshot('Assume a queen at '+squareName(extraQueen)+'.',{targets:[extraQueen],extraQueens:assumed?[extraQueen]:[]});
+    if(assumed){snapshot('Contradiction: '+assumed.contradiction,{problemTiles:assumed.problemTiles,extraQueens:[extraQueen]});return{tile:extraQueen,steps:steps,events:events}}
+  }
+  function candidateList(type,index){return unitBoardCells(type,index).filter(function(x){return!queens.has(x)&&!eliminated.has(x)})}
+  function queenInUnit(type,index){var found=-1;queens.forEach(function(q){var r=Math.floor(q/n),c=q%n;if(type==='row'&&r===index||type==='col'&&c===index||type==='region'&&regions[q]===index)found=q});return found}
+  function contradictionFor(type,index,reference){var tiles=unitBoardCells(type,index).map(squareName);return unitLabel(type,index,reference)+' has no legal tile'+(tiles.length<=8?' ('+tiles.join(', ')+')':'')+'.'}
+  function forcedStep(type,index,tile){if(type==='row')return'Row '+rowNumber(index)+': only '+squareName(tile)+' remains, so a queen is forced there.';if(type==='col')return'Column '+columnName(index)+': only '+squareName(tile)+' remains, so a queen is forced there.';return'Only '+squareName(tile)+' remains in its colored region, so a queen is forced there.'}
+  function ruledOutText(list){return list.map(squareName).join(', ')+' '+(list.length===1?'is':'are')+' ruled out.'}
+  function forcePass(){
+    var types=['row','col','region'];
+    for(var ti=0;ti<types.length;ti++)for(var index=0;index<n;index++){
+      var type=types[ti];if(queenInUnit(type,index)>=0)continue;var list=candidateList(type,index),unit=unitBoardCells(type,index),reference=list[0]!=null?list[0]:unit[0];
+      if(!list.length)return{contradiction:contradictionFor(type,index,reference),area:unit,problemTiles:unit};
+      if(list.length===1){var tile=list[0],result=addQueen(tile),text=forcedStep(type,index,tile);if(result)return{contradiction:result.contradiction,area:unit,problemTiles:result.problemTiles,extraQueens:[tile]};snapshot(text,{targets:[tile],area:unit});return{changed:true}}
+    }
+    return{changed:false}
+  }
+  function lockedPass(){
+    var source,target,newTiles,desc,reference;
+    for(var r=0;r<n;r++)if(queenInUnit('row',r)<0){source=candidateList('row',r);if(source.length>1){var regs=Array.from(new Set(source.map(function(x){return regions[x]})));if(regs.length===1){target=unitBoardCells('region',regs[0]).filter(function(x){return Math.floor(x/n)!==r});newTiles=target.filter(function(x){return recordElimination(x,'row '+rowNumber(r)+' must place its queen inside this colored region')});if(newTiles.length){reference=source[0];desc='Row '+rowNumber(r)+' is confined to the region at '+squareName(reference)+', so '+ruledOutText(newTiles);snapshot(desc,{area:source.concat(newTiles),targets:newTiles});return true}}}}
+    for(var c=0;c<n;c++)if(queenInUnit('col',c)<0){source=candidateList('col',c);if(source.length>1){regs=Array.from(new Set(source.map(function(x){return regions[x]})));if(regs.length===1){target=unitBoardCells('region',regs[0]).filter(function(x){return x%n!==c});newTiles=target.filter(function(x){return recordElimination(x,'column '+columnName(c)+' must place its queen inside this colored region')});if(newTiles.length){reference=source[0];desc='Column '+columnName(c)+' is confined to the region at '+squareName(reference)+', so '+ruledOutText(newTiles);snapshot(desc,{area:source.concat(newTiles),targets:newTiles});return true}}}}
+    for(var rid=0;rid<n;rid++)if(queenInUnit('region',rid)<0){source=candidateList('region',rid);if(source.length>1){var rows=Array.from(new Set(source.map(function(x){return Math.floor(x/n)})));if(rows.length===1){target=unitBoardCells('row',rows[0]).filter(function(x){return regions[x]!==rid});newTiles=target.filter(function(x){return recordElimination(x,'this colored region must place its queen in row '+rowNumber(rows[0]))});if(newTiles.length){reference=source[0];snapshot('The region at '+squareName(reference)+' is confined to row '+rowNumber(rows[0])+', so '+ruledOutText(newTiles),{area:source.concat(newTiles),targets:newTiles});return true}}var cols=Array.from(new Set(source.map(function(x){return x%n})));if(cols.length===1){target=unitBoardCells('col',cols[0]).filter(function(x){return regions[x]!==rid});newTiles=target.filter(function(x){return recordElimination(x,'this colored region must place its queen in column '+columnName(cols[0]))});if(newTiles.length){reference=source[0];snapshot('The region at '+squareName(reference)+' is confined to column '+columnName(cols[0])+', so '+ruledOutText(newTiles),{area:source.concat(newTiles),targets:newTiles});return true}}}}
+    return false
+  }
+  for(var pass=0;pass<maxSteps;pass++){
+    var forced=forcePass();
+    if(forced.contradiction){snapshot('Contradiction: '+forced.contradiction,{area:forced.area,problemTiles:forced.problemTiles,extraQueens:forced.extraQueens});return{tile:extraQueen,steps:steps,events:events}}
+    if(forced.changed)continue;
+    if(lockedPass())continue;
+    break
+  }
+  return null
+}
+function formatProof(steps){var seen=new Set(),clean=[];steps.forEach(function(step){var key=step.replace(/\s+/g,' ').trim();if(key&&!seen.has(key)){seen.add(key);clean.push(key)}});return clean.map(function(step,index){return(index+1)+'. '+step}).join('\n')}
+function findImpossibleTile(){
+  var baseline=logicalProofForTile(-1);if(baseline){if(baseline.baselineInvalid)return{tile:-1,text:baseline.text};if(baseline.steps)return{tile:-1,text:'The current queens or X marks already cause a contradiction:\n'+formatProof(baseline.steps)}};
+  var shownBlocked=$('#autoXs').checked?autoBlockedSet():new Set(),candidates=[];
+  for(var i=0;i<n*n;i++)if(cells[i]===0&&!shownBlocked.has(i)&&hintHistory.indexOf(i)<0)candidates.push(i);
+  var proofs=[];
+  for(var k=0;k<candidates.length;k++){var proof=logicalProofForTile(candidates[k]);if(proof&&proof.steps)proofs.push(proof)}
+  proofs.sort(function(a,b){return a.steps.length-b.steps.length||a.tile-b.tile});
+  return proofs.length?proofs[0]:null;
+}
+function setHintProofStatus(events,activeIndex,remaining,finished){
+  statusEl.textContent='';statusEl.className='status hint';var list=document.createElement('ol');
+  events.forEach(function(event,index){var item=document.createElement('li');item.textContent=event.text;if(index<activeIndex||finished)item.className='done';if(index===activeIndex&&!finished)item.className='active';list.appendChild(item)});statusEl.appendChild(list);
+  var footer=document.createElement('div');footer.className='hint-footer';footer.textContent=remaining+' check'+(remaining===1?'':'s')+' left.';statusEl.appendChild(footer)
+}
+function hintVisualFromEvent(event){return{area:event.area||[],targets:event.targets||[],problem:false,problemTiles:event.problemTiles||[],simQueens:event.simQueens||[],simXs:event.simXs||[]}}
+function playHintProof(result){
+  stopHintPlayback();cancelIdleHint();
+  var events=(result.events||[]).slice(),last=events.length?events[events.length-1]:{area:[],targets:[],problemTiles:[],simQueens:[],simXs:[]};
+  function merged(a,b){return Array.from(new Set((a||[]).concat(b||[])))}
+  var finalEvent={
+    text:'Therefore '+squareName(result.tile)+' cannot contain a queen.',
+    area:last.area||[],
+    targets:merged(last.targets,[result.tile]),
+    problemTiles:last.problemTiles||[],
+    simQueens:last.simQueens||[],
+    simXs:merged(last.simXs,[result.tile])
+  };
+  events.push(finalEvent);
+  hintVisual=hintVisualFromEvent(finalEvent);
+  renderBoard();
+  setHintProofStatus(events,-1,hintsLeft,true)
+}
+function hint(){
+  if(solved||hintsLeft<=0)return;
+  clearHintVisual();var result=findImpossibleTile();
+  if(!result||result.tile<0){renderBoard();setStatus(result&&result.text||'No empty, unmarked tile can currently be ruled out by a direct logical contradiction. Add more queens or X marks first.','hint');resetIdleHint();return}
+  hintsLeft--;hintHistory.push(result.tile);playHintProof(result)
+}
+function showMistakes(){if(solved)return;var wrong=[];for(var i=0;i<n*n;i++){var r=Math.floor(i/n),correct=solution[r]===i%n;if(cells[i]===2&&!correct||cells[i]===1&&correct)wrong.push(i)}hintVisual={area:[],targets:wrong,problem:true};renderBoard();if(wrong.length)setStatus(wrong.length+' incorrectly marked tile'+(wrong.length===1?' is':'s are')+' highlighted.','bad');else setStatus('No incorrectly placed marks found.','ok')}
+function cellFromTarget(target){var cell=target&&target.closest?target.closest('.cell'):null;return cell&&boardEl.contains(cell)?Number(cell.dataset.i):-1}
+function cellFromPoint(x,y){return cellFromTarget(document.elementFromPoint(x,y))}
+function lineCells(from,to){var r1=Math.floor(from/n),c1=from%n,r2=Math.floor(to/n),c2=to%n,steps=Math.max(Math.abs(r2-r1),Math.abs(c2-c1)),out=[];if(!steps)return[from];for(var k=0;k<=steps;k++){var r=Math.round(r1+(r2-r1)*k/steps),c=Math.round(c1+(c2-c1)*k/steps),i=r*n+c;if(out[out.length-1]!==i)out.push(i)}return out}
+function paintXs(indices){var changed=indices.filter(function(i){return i>=0&&cells[i]!==1&&cells[i]!==2});if(!changed.length)return false;clearHintVisual();if(!dragState.historySaved){pushHistory();dragState.historySaved=true}changed.forEach(function(i){cells[i]=1;if(solution[Math.floor(i/n)]!==i%n)dragState.validPlaced=true});dragState.changed=true;renderBoard();return true}
+function finishDrag(click){var state=dragState;if(!state)return;dragState=null;if(state.mock){if(state.active){setStatus(mockQueens.size+' mock queen'+(mockQueens.size===1?'':'s')+' and '+mockXs.size+' mock X'+(mockXs.size===1?'':'s')+'.')}else if(click)cycleMockCell(state.start,false);return}if(state.active){if(state.changed){moves++;if(state.validPlaced)resetIdleHint();else resumeIdleHint();renderBoard();checkProgress()}else setStatus('No cells changed.')}else if(click)cycleCell(state.start,autoBlockedSet().has(state.start),false)}
+function beginDrag(id,i){dragState={pointerId:id,start:i,last:i,active:false,historySaved:false,changed:false,validPlaced:false,mock:mockMode}}
+function moveDrag(id,x,y){if(!dragState||dragState.pointerId!==id)return;var i=cellFromPoint(x,y);if(i<0||i===dragState.last)return;var prev=dragState.last;dragState.last=i;dragState.active=true;if(dragState.mock){paintMockXs(lineCells(prev,i).concat([dragState.start]));return}paintXs(lineCells(prev,i).concat(dragState.historySaved?[]:[dragState.start]))}
+if(window.PointerEvent){boardEl.addEventListener('pointerdown',function(e){if(solved||e.button!==0)return;var i=cellFromTarget(e.target);if(i<0)return;e.preventDefault();beginDrag(e.pointerId,i);try{boardEl.setPointerCapture(e.pointerId)}catch(err){}});boardEl.addEventListener('pointermove',function(e){if(!dragState||dragState.pointerId!==e.pointerId)return;e.preventDefault();moveDrag(e.pointerId,e.clientX,e.clientY)});boardEl.addEventListener('pointerup',function(e){if(dragState&&dragState.pointerId===e.pointerId){e.preventDefault();finishDrag(true)}});boardEl.addEventListener('pointercancel',function(e){if(dragState&&dragState.pointerId===e.pointerId)finishDrag(false)})}else{boardEl.addEventListener('touchstart',function(e){if(!e.touches.length)return;var t=e.touches[0],i=cellFromPoint(t.clientX,t.clientY);if(i<0)return;e.preventDefault();beginDrag('touch',i)},{passive:false});boardEl.addEventListener('touchmove',function(e){if(!dragState||!e.touches.length)return;var t=e.touches[0];e.preventDefault();moveDrag('touch',t.clientX,t.clientY)},{passive:false});boardEl.addEventListener('touchend',function(e){if(dragState){e.preventDefault();finishDrag(true)}},{passive:false});boardEl.addEventListener('mousedown',function(e){var i=cellFromTarget(e.target);if(i>=0){e.preventDefault();beginDrag('mouse',i)}});window.addEventListener('mousemove',function(e){if(dragState&&dragState.pointerId==='mouse')moveDrag('mouse',e.clientX,e.clientY)});window.addEventListener('mouseup',function(){if(dragState&&dragState.pointerId==='mouse')finishDrag(true)})}
+boardEl.addEventListener('click',function(e){if(e.detail!==0)return;var i=cellFromTarget(e.target);if(i>=0){if(mockMode)cycleMockCell(i,false);else cycleCell(i,autoBlockedSet().has(i),false)}});boardEl.addEventListener('contextmenu',function(e){var i=cellFromTarget(e.target);if(i>=0){e.preventDefault();if(mockMode)cycleMockCell(i,true);else cycleCell(i,autoBlockedSet().has(i),true)}});
+function applySize(){var value=Number(sizeInput.value);if(!Number.isInteger(value)||value<MIN_SIZE||value>MAX_SIZE){setStatus('Enter a whole board size from 4 to 25.','bad');return}n=value;generateGame()}
+['pointerdown','mousedown','touchstart'].forEach(function(type){document.addEventListener(type,function(){clearHeldMocksOnPress()},true)});document.addEventListener('keydown',function(){clearHeldMocksOnPress()},true);
+$('#mockMode').addEventListener('click',function(){setMockMode(!mockMode)});$('#clearMocks').addEventListener('click',function(){clearHintVisual();clearMockQueens(true)});document.addEventListener('keydown',function(e){if((e.key==='m'||e.key==='M')&&!/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||'')){e.preventDefault();setMockMode(!mockMode)}});$('#applySize').addEventListener('click',applySize);sizeInput.addEventListener('keydown',function(e){if(e.key==='Enter')applySize()});$('#newGame').addEventListener('click',generateGame);$('#undo').addEventListener('click',undo);$('#clear').addEventListener('click',clearBoard);$('#mistakes').addEventListener('click',showMistakes);$('#hint').addEventListener('click',hint);$('#autoCheck').addEventListener('change',function(){clearHintVisual();resetIdleHint();renderBoard();checkProgress()});$('#autoXs').addEventListener('change',function(){clearHintVisual();resetIdleHint();renderBoard()});$('#closeWin').addEventListener('click',function(){$('#win').classList.remove('show')});$('#winNew').addEventListener('click',function(){$('#win').classList.remove('show');generateGame()});
+window.__queensDebug={playableCells:playableCells,findImpossibleTile:findImpossibleTile,getCells:function(){return cells.slice()},getN:function(){return n},forcedQueenDeductions:function(){return forcedQueenDeductions(openCandidates())},showIdleForcedFlash:showIdleForcedFlash,getHintVisual:function(){return hintVisual},getMockQueens:function(){return Array.from(mockQueens)},getMockXs:function(){return Array.from(mockXs)},setMockMode:setMockMode,toggleMockQueen:toggleMockQueen,cycleMockCell:cycleMockCell,mockInfluenceData:mockInfluenceData,clearHeldMocksOnPress:clearHeldMocksOnPress,isMockClearArmed:function(){return mockClearOnNextPress},verifyCurrentBoard:function(){var checked=solvePuzzle(regions,n,2);return{count:checked.count,solution:checked.solution,regionsValid:validRegionMap(regions,n)}}};
+generateGame();
+})();
+</script>
+</body>
+</html>
