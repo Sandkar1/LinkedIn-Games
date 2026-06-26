@@ -831,7 +831,7 @@ button.primary{
 .wend-board{--wend-size:4;grid-template-columns:repeat(var(--wend-size),1fr)}
 .wend-board[data-size="5"]{width:min(100%,470px);gap:5px}.wend-board[data-size="3"]{width:min(100%,360px)}
 .patch-board{--patch-size:5;grid-template-columns:repeat(var(--patch-size),1fr);background:#f7f9fb}
-.patch-cell{position:relative;isolation:isolate;overflow:hidden;transition:none}
+.patch-cell{position:relative;isolation:isolate;overflow:hidden;transition:background-color 120ms var(--ease),box-shadow 120ms var(--ease),filter 120ms var(--ease),transform 120ms var(--ease)}
 .patch-cell .clue{z-index:4;box-shadow:0 2px 5px rgba(20,30,40,.14)}
 .patch-cell.filled{color:#1b2a38}
 .patch-cell.shape-0{background:linear-gradient(145deg,#9bdcff,#c8efff)}
@@ -923,11 +923,14 @@ button.primary{
 .queens-controls{grid-template-columns:auto minmax(78px,110px) auto 1fr}
 .patch-board{touch-action:none;-webkit-user-select:none;user-select:none}
 .patch-cell.clue-cell{cursor:grab}
+.patch-cell.clue-cell:active{cursor:grabbing}
 .patch-cell.drag-origin{box-shadow:inset 0 0 0 4px #0a66c2,0 0 0 2px rgba(255,250,240,.92);z-index:8}
-.patch-cell.patch-preview{z-index:6;background:rgba(10,102,194,.13)!important}
-.patch-cell.patch-preview-valid{background:rgba(5,118,66,.18)!important}
-.patch-cell.patch-preview-invalid{background:rgba(180,35,24,.16)!important}
+.patch-cell.patch-preview{z-index:6;background:color-mix(in srgb,var(--patch-fill,#63c8ff) 68%,#fffaf0)!important}
+.patch-cell.patch-preview-valid{box-shadow:inset 0 0 0 2px #147a42}
+.patch-cell.patch-preview-invalid{box-shadow:inset 0 0 0 2px #b42318;filter:saturate(.82) brightness(.98)}
 .patch-cell.patch-preview-edge{box-shadow:inset 0 0 0 2px currentColor}
+.patch-cell.patch-preview-valid.patch-preview-edge{box-shadow:inset 0 0 0 2px #147a42}
+.patch-cell.patch-preview-invalid.patch-preview-edge{box-shadow:inset 0 0 0 2px #b42318}
 .patch-cell .clue:empty::after{content:""}
 .cross-main{overflow:visible}
 .cross-ladder{width:min(100%,420px);margin:14px auto 12px;display:grid;gap:10px;touch-action:none;user-select:none}
@@ -1066,14 +1069,32 @@ button{border-color:var(--line);background:linear-gradient(#fffaf0,#f4eadb)}
 #patchesScreen .patch-cell{background:#fffaf0}
 #patchesScreen .patch-cell.clue-cell:not(.filled){background:#fff5df}
 #patchesScreen .patch-cell.filled{background:var(--patch-fill,#fffaf0)!important;border-color:#8d6c43!important}
+#patchesScreen .patch-cell.patch-misfit{box-shadow:inset 0 0 0 2px rgba(180,35,24,.72)}
+#patchesScreen .patch-cell.patch-preview{background:color-mix(in srgb,var(--patch-fill,#63c8ff) 72%,#fffaf0)!important}
+#patchesScreen .patch-cell.patch-preview-valid{box-shadow:inset 0 0 0 2px #147a42!important}
+#patchesScreen .patch-cell.patch-preview-invalid{box-shadow:inset 0 0 0 2px #b42318!important}
 /* Each clue type has a fixed, unmistakable silhouette regardless of the patch area. */
-#patchesScreen .patch-cell .clue{display:grid;place-items:center;border:2px solid #26323d!important;border-radius:6px!important;box-shadow:0 1px 0 rgba(255,255,255,.55),0 2px 4px rgba(45,35,20,.20)!important;font-size:clamp(.82rem,4vw,1.05rem);font-weight:900;line-height:1}
-#patchesScreen .patch-cell .clue.patch-square{width:52%!important;height:auto!important;aspect-ratio:1}
-#patchesScreen .patch-cell .clue.patch-wide{width:74%!important;height:36%!important}
-#patchesScreen .patch-cell .clue.patch-tall{width:36%!important;height:74%!important}
+#patchesScreen .patch-board[data-size="7"],#patchesScreen .patch-board[data-size="8"]{width:min(100%,540px)}
+#patchesScreen .patch-cell .clue{
+  display:grid;place-items:center;box-sizing:border-box;min-width:24px;min-height:24px;padding:0 2px;
+  border:2px solid #26323d!important;border-radius:7px!important;background:var(--patch-clue);color:#111!important;
+  box-shadow:0 1px 0 rgba(255,255,255,.55),0 2px 4px rgba(45,35,20,.20)!important;
+  font-size:1rem;font-weight:950;line-height:1;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:0
+}
+#patchesScreen .patch-cell .clue.patch-square{width:68%!important;height:auto!important;aspect-ratio:1}
+#patchesScreen .patch-cell .clue.patch-wide{width:88%!important;height:58%!important}
+#patchesScreen .patch-cell .clue.patch-tall{width:58%!important;height:88%!important}
+#patchesScreen .patch-board[data-size="4"] .patch-cell .clue,#patchesScreen .patch-board[data-size="5"] .patch-cell .clue{font-size:1.05rem}
+#patchesScreen .patch-board[data-size="7"] .patch-cell .clue,#patchesScreen .patch-board[data-size="8"] .patch-cell .clue{font-size:.95rem;min-width:26px;min-height:26px}
+#patchesScreen .patch-board[data-size="7"] .patch-cell .clue.patch-square,#patchesScreen .patch-board[data-size="8"] .patch-cell .clue.patch-square{width:74%!important}
+#patchesScreen .patch-board[data-size="7"] .patch-cell .clue.patch-wide,#patchesScreen .patch-board[data-size="8"] .patch-cell .clue.patch-wide{width:92%!important;height:64%!important}
+#patchesScreen .patch-board[data-size="7"] .patch-cell .clue.patch-tall,#patchesScreen .patch-board[data-size="8"] .patch-cell .clue.patch-tall{width:64%!important;height:92%!important}
 #patchesScreen .patch-cell.drag-origin{box-shadow:inset 0 0 0 3px #a67431,0 0 0 2px #fff8e8!important}
 #patchesScreen .patch-cell.patch-preview-edge{box-shadow:inset 0 0 0 2px currentColor!important}
-#sudokuScreen .sudoku-cell{background:#fffaf0!important;color:#263746!important;font-weight:900;box-shadow:none}
+#patchesScreen .patch-cell.patch-preview-valid.patch-preview-edge{box-shadow:inset 0 0 0 2px #147a42!important}
+#patchesScreen .patch-cell.patch-preview-invalid.patch-preview-edge{box-shadow:inset 0 0 0 2px #b42318!important}
+#sudokuScreen .sudoku-board,#sudokuScreen .sudoku-cell{-webkit-user-select:none;user-select:none}
+#sudokuScreen .sudoku-cell{background:#fffaf0!important;color:#263746!important;font-weight:900;box-shadow:none;caret-color:transparent;cursor:pointer}
 #sudokuScreen .sudoku-cell.given{background:#e3f2e2!important;color:#165b3a!important}
 #sudokuScreen .sudoku-cell.conflict{background:#ffe3d9!important;color:#9d2d21!important}
 #sudokuScreen .sudoku-cell.selected{background:#fff0c6!important;box-shadow:inset 0 0 0 3px #1769d2,0 0 0 1px rgba(23,105,210,.2)!important}
