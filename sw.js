@@ -1,4 +1,9 @@
-var CACHE_NAME='puzzle-games-v1';
+var CACHE_NAME='puzzle-games-v2';
+var NETWORK_FIRST_URLS=[
+  'assets/app.css',
+  'assets/app.js',
+  'sw.js'
+];
 var OFFLINE_URLS=[
   './',
   'index.html',
@@ -42,6 +47,21 @@ self.addEventListener('fetch',function(event){
   if(request.method!=='GET')return;
   var url=new URL(request.url);
   if(url.origin!==self.location.origin)return;
+  var path=url.pathname.replace(self.registration.scope.replace(url.origin,''),'').replace(/^\/+/,'');
+  if(NETWORK_FIRST_URLS.indexOf(path)>=0){
+    event.respondWith(
+      fetch(request).then(function(response){
+        if(response&&response.ok){
+          var copy=response.clone();
+          caches.open(CACHE_NAME).then(function(cache){cache.put(request,copy);});
+        }
+        return response;
+      }).catch(function(){
+        return caches.match(request);
+      })
+    );
+    return;
+  }
   if(request.mode==='navigate'){
     event.respondWith(
       fetch(request).then(function(response){
