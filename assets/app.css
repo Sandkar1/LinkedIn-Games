@@ -647,6 +647,7 @@ button.primary{
   -webkit-backdrop-filter:blur(7px);
 }
 .win.show{display:grid;animation:modalBackdropIn 180ms ease-out both}
+body.win-open{overflow:hidden}
 .win-card{
   width:min(92vw,405px);
   padding:29px;

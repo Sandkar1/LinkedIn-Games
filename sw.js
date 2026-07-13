@@ -1,5 +1,5 @@
-var CACHE_NAME='puzzle-games-v2';
-var NETWORK_FIRST_URLS=[
+var CACHE_NAME='puzzle-games-v3';
+var APP_SHELL_URLS=[
   'assets/app.css',
   'assets/app.js',
   'sw.js'
@@ -48,29 +48,25 @@ self.addEventListener('fetch',function(event){
   var url=new URL(request.url);
   if(url.origin!==self.location.origin)return;
   var path=url.pathname.replace(self.registration.scope.replace(url.origin,''),'').replace(/^\/+/,'');
-  if(NETWORK_FIRST_URLS.indexOf(path)>=0){
-    event.respondWith(
-      fetch(request).then(function(response){
-        if(response&&response.ok){
-          var copy=response.clone();
-          caches.open(CACHE_NAME).then(function(cache){cache.put(request,copy);});
-        }
-        return response;
-      }).catch(function(){
-        return caches.match(request);
-      })
-    );
-    return;
-  }
-  if(request.mode==='navigate'){
-    event.respondWith(
-      fetch(request).then(function(response){
+  function fetchAndCache(){
+    return fetch(request).then(function(response){
+      if(response&&response.ok){
         var copy=response.clone();
         caches.open(CACHE_NAME).then(function(cache){cache.put(request,copy);});
-        return response;
-      }).catch(function(){
-        return caches.match(request).then(function(cached){
-          return cached||caches.match('index.html');
+      }
+      return response;
+    });
+  }
+  if(request.mode==='navigate'||APP_SHELL_URLS.indexOf(path)>=0){
+    var refresh=fetchAndCache().catch(function(){return null;});
+    event.waitUntil(refresh);
+    event.respondWith(
+      caches.match(request,{ignoreSearch:true}).then(function(cached){
+        if(cached)return cached;
+        return refresh.then(function(response){
+          if(response)return response;
+          if(request.mode==='navigate')return caches.match('index.html');
+          return caches.match(request,{ignoreSearch:true});
         });
       })
     );
