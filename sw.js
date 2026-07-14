@@ -1,4 +1,4 @@
-var CACHE_NAME='puzzle-games-v3';
+var CACHE_NAME='puzzle-games-v4-mobile-win';
 var APP_SHELL_URLS=[
   'assets/app.css',
   'assets/app.js',
@@ -16,8 +16,8 @@ var OFFLINE_URLS=[
   'tango.html',
   'pinpoint.html',
   'crossclimb.html',
-  'assets/app.css',
-  'assets/app.js'
+  'assets/app.css?v=20260714-1',
+  'assets/app.js?v=20260714-1'
 ];
 
 self.addEventListener('install',function(event){
@@ -52,19 +52,18 @@ self.addEventListener('fetch',function(event){
     return fetch(request).then(function(response){
       if(response&&response.ok){
         var copy=response.clone();
-        caches.open(CACHE_NAME).then(function(cache){cache.put(request,copy);});
+        return caches.open(CACHE_NAME).then(function(cache){
+          return cache.put(request,copy);
+        }).catch(function(){}).then(function(){return response;});
       }
       return response;
     });
   }
   if(request.mode==='navigate'||APP_SHELL_URLS.indexOf(path)>=0){
-    var refresh=fetchAndCache().catch(function(){return null;});
-    event.waitUntil(refresh);
     event.respondWith(
-      caches.match(request,{ignoreSearch:true}).then(function(cached){
-        if(cached)return cached;
-        return refresh.then(function(response){
-          if(response)return response;
+      fetchAndCache().catch(function(){
+        return caches.match(request,{ignoreSearch:true}).then(function(cached){
+          if(cached)return cached;
           if(request.mode==='navigate')return caches.match('index.html');
           return caches.match(request,{ignoreSearch:true});
         });

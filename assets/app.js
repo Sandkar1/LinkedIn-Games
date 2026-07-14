@@ -88,29 +88,69 @@ document.body.insertAdjacentHTML('afterbegin',`
 
 var START_GAME=(document.body&&document.body.dataset.startGame)||'home';
 
+var winPopupSequence=0;
+function clearWinPopupTimers(popup){
+  if(!popup)return;
+  if(popup._winPopupFrame)window.cancelAnimationFrame(popup._winPopupFrame);
+  if(popup._winPopupEnableTimer)window.clearTimeout(popup._winPopupEnableTimer);
+  if(popup._winPopupCheckTimer)window.clearTimeout(popup._winPopupCheckTimer);
+  popup._winPopupFrame=0;
+  popup._winPopupEnableTimer=0;
+  popup._winPopupCheckTimer=0;
+}
+function keepWinPopupVisible(popup,token){
+  if(!popup||popup._winPopupToken!==token||popup.getAttribute('aria-hidden')!=='false')return;
+  if(popup.parentNode!==document.body)document.body.appendChild(popup);
+  popup.hidden=false;
+  popup.removeAttribute('hidden');
+  popup.style.setProperty('display','grid','important');
+  popup.style.setProperty('visibility','visible','important');
+  popup.classList.add('show');
+  document.documentElement.classList.add('win-open');
+  document.body.classList.add('win-open');
+}
 function openWinPopup(popup,focusTarget){
   if(!popup)return;
+  clearWinPopupTimers(popup);
+  var token=++winPopupSequence;
+  popup._winPopupToken=token;
   if(popup.parentNode!==document.body)document.body.appendChild(popup);
   popup.classList.remove('show');
+  popup.classList.add('win-opening');
   popup.hidden=false;
-  popup.style.display='grid';
+  popup.removeAttribute('hidden');
+  popup.style.setProperty('display','grid','important');
+  popup.style.setProperty('visibility','visible','important');
   popup.setAttribute('aria-hidden','false');
-  void popup.offsetWidth;
-  popup.classList.add('show');
+  popup.dataset.openedAt=String(Date.now());
+  document.documentElement.classList.add('win-open');
   document.body.classList.add('win-open');
-  window.requestAnimationFrame(function(){
-    if(popup.getAttribute('aria-hidden')!=='false')return;
-    popup.style.display='grid';
-    popup.classList.add('show');
-    if(focusTarget){try{focusTarget.focus({preventScroll:true})}catch(err){focusTarget.focus()}}
+  void popup.offsetWidth;
+  popup._winPopupFrame=window.requestAnimationFrame(function(){
+    popup._winPopupFrame=0;
+    keepWinPopupVisible(popup,token);
+    popup._winPopupEnableTimer=window.setTimeout(function(){
+      if(popup._winPopupToken!==token||popup.getAttribute('aria-hidden')!=='false')return;
+      popup.classList.remove('win-opening');
+      if(focusTarget){try{focusTarget.focus({preventScroll:true})}catch(err){focusTarget.focus()}}
+    },450);
+    popup._winPopupCheckTimer=window.setTimeout(function(){keepWinPopupVisible(popup,token)},800);
   });
 }
 function closeWinPopup(popup){
   if(!popup)return;
+  popup._winPopupToken=++winPopupSequence;
+  clearWinPopupTimers(popup);
+  popup.classList.remove('win-opening');
   popup.classList.remove('show');
   popup.style.removeProperty('display');
+  popup.style.removeProperty('visibility');
   popup.setAttribute('aria-hidden','true');
-  if(!document.querySelector('.win.show'))document.body.classList.remove('win-open');
+  popup.hidden=true;
+  if(!document.querySelector('.win.show,.win.win-opening')){
+    document.documentElement.classList.remove('win-open');
+    document.body.classList.remove('win-open');
+  }
 }
 
 (function(){
@@ -887,7 +927,11 @@ window.__dailyGamesDebug={
 };
 if('serviceWorker' in navigator&&window.isSecureContext){
   window.addEventListener('load',function(){
-    navigator.serviceWorker.register('sw.js').catch(function(){});
+    navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(registration){
+      registration.update().catch(function(){});
+    }).catch(function(){
+      navigator.serviceWorker.register('sw.js').catch(function(){});
+    });
   });
 }
 showScreen(START_GAME);
