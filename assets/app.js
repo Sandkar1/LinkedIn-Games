@@ -846,12 +846,87 @@ function clearZip(){zipPath=[];renderZip();setMiniStatus('#zipStatus','Unique pa
 q('#zipGrid').addEventListener('pointerdown',function(e){var cell=e.target.closest('.zip-cell');if(!cell)return;e.preventDefault();zipDragging=true;addZipCell(Number(cell.dataset.i));try{q('#zipGrid').setPointerCapture(e.pointerId)}catch(err){}});q('#zipGrid').addEventListener('pointermove',function(e){if(!zipDragging)return;var el=document.elementFromPoint(e.clientX,e.clientY),cell=el&&el.closest('.zip-cell');if(cell&&q('#zipGrid').contains(cell))addZipCell(Number(cell.dataset.i))});q('#zipGrid').addEventListener('pointerup',function(){zipDragging=false});q('#zipGrid').addEventListener('pointercancel',function(){zipDragging=false});
 q('#zipUndo').addEventListener('click',function(){zipPath.pop();renderZip()});q('#zipReset').addEventListener('click',clearZip);q('#zipNew').addEventListener('click',newZip);q('#zipSize').addEventListener('change',newZip);q('#zipDifficulty').addEventListener('change',newZip);q('#zipHint').addEventListener('click',function(){var next=zipSolution[zipPath.length];if(next==null)return;if(!zipPath.length||zipPath.every(function(x,j){return x===zipSolution[j]})){addZipCell(next);setMiniStatus('#zipStatus','The next correct step was added.','good')}else{var good=0;while(good<zipPath.length&&zipPath[good]===zipSolution[good])good++;zipPath=zipPath.slice(0,good);renderZip();setMiniStatus('#zipStatus','The path was trimmed back to the first mistake.','good')}});if(START_GAME==='zip')newZip();
 
-/* Tango: every generated clue set is counted to exactly one completion. */
-var tangoSize=6,tangoSolution=[],tangoGivens=new Set(),tangoRelations=[],tangoValues=[],tangoHistory=[],tangoRecent=[];
+/* Tango: generated rounds are unique, logically solvable, and calibrated within each size/difficulty band. */
+var tangoSize=6,tangoSolution=[],tangoGivens=new Set(),tangoRelations=[],tangoValues=[],tangoHistory=[],tangoRecent=[],tangoLastGenerationStats=null;
+var TANGO_DIFFICULTY_CONFIG={
+  4:{easy:{givens:6,relations:8},medium:{givens:4,relations:6},hard:{givens:3,relations:5},expert:{givens:2,relations:4},master:{givens:2,relations:4}},
+  6:{easy:{givens:14,relations:12},medium:{givens:10,relations:10},hard:{givens:8,relations:8},expert:{givens:6,relations:7},master:{givens:5,relations:6}},
+  8:{easy:{givens:24,relations:16},medium:{givens:18,relations:13},hard:{givens:14,relations:11},expert:{givens:11,relations:9},master:{givens:10,relations:8}}
+};
+var TANGO_SCORE_TARGETS={4:{easy:125,medium:175,hard:215,expert:235,master:260},6:{easy:280,medium:365,hard:420,expert:475,master:520},8:{easy:505,medium:645,hard:740,expert:810,master:865}};
+function tangoDifficultyConfig(){return TANGO_DIFFICULTY_CONFIG[tangoSize][difficulty('#tangoDifficulty')]}
 function tangoValidPatterns(n){var half=n/2,out=[];for(var mask=0;mask<(1<<n);mask++){var row=[],ones=0,ok=true;for(var c=0;c<n;c++){var v=(mask>>c&1)?1:2;row.push(v);if(v===1)ones++;if(c>=2&&row[c]===row[c-1]&&row[c]===row[c-2])ok=false}if(ok&&ones===half)out.push(row)}return out}
 function generateTangoSolution(n){var patterns=tangoValidPatterns(n),half=n/2;for(var attempt=0;attempt<48;attempt++){shuffle(patterns);var rows=[],colOnes=Array(n).fill(0);function dfs(r){if(r===n)return true;for(var pi=0;pi<patterns.length;pi++){var candidate=patterns[(pi+attempt)%patterns.length],valid=true,remaining=n-r-1;for(var c=0;c<n;c++){var ones=colOnes[c]+(candidate[c]===1?1:0);if(ones>half||ones+remaining<half){valid=false;break}if(r>=2&&rows[r-1][c]===candidate[c]&&rows[r-2][c]===candidate[c]){valid=false;break}}if(!valid)continue;rows.push(candidate.slice());for(c=0;c<n;c++)if(candidate[c]===1)colOnes[c]++;if(dfs(r+1))return true;for(c=0;c<n;c++)if(candidate[c]===1)colOnes[c]--;rows.pop()}return false}if(dfs(0))return rows.flat()}return null}
 function countTangoSolutions(givens,relations,limit){var n=tangoSize,half=n/2,patterns=tangoValidPatterns(n),rows=[],colOnes=Array(n).fill(0),count=0,horizontal=relations.filter(function(rel){return Math.floor(rel.a/n)===Math.floor(rel.b/n)}),vertical=relations.filter(function(rel){return Math.abs(rel.a-rel.b)===n}),rowCandidates=range(n).map(function(r){return patterns.filter(function(p){for(var c=0;c<n;c++){var i=r*n+c;if(givens.has(i)&&p[c]!==tangoSolution[i])return false}for(var k=0;k<horizontal.length;k++){var rel=horizontal[k];if(Math.floor(rel.a/n)!==r)continue;var a=p[rel.a%n],b=p[rel.b%n];if((rel.s==='='&&a!==b)||(rel.s==='×'&&a===b))return false}return true})});function dfs(r){if(count>=limit)return;if(r===n){if(colOnes.every(function(x){return x===half}))count++;return}var remaining=n-r-1,cands=rowCandidates[r];for(var pi=0;pi<cands.length;pi++){var candidate=cands[pi],valid=true;for(var c=0;c<n;c++){var ones=colOnes[c]+(candidate[c]===1?1:0);if(ones>half||ones+remaining<half){valid=false;break}if(r>=2&&rows[r-1][c]===candidate[c]&&rows[r-2][c]===candidate[c]){valid=false;break}}if(!valid)continue;for(var k=0;k<vertical.length;k++){var rel=vertical[k],lower=Math.max(rel.a,rel.b),rr=Math.floor(lower/n);if(rr!==r)continue;var upper=lower-n,a=rows[r-1][upper%n],b=candidate[lower%n];if((rel.s==='='&&a!==b)||(rel.s==='×'&&a===b)){valid=false;break}}if(!valid)continue;rows.push(candidate);for(c=0;c<n;c++)if(candidate[c]===1)colOnes[c]++;dfs(r+1);for(c=0;c<n;c++)if(candidate[c]===1)colOnes[c]--;rows.pop();if(count>=limit)return}}dfs(0);return count}
-function buildTangoPuzzle(){for(var attempt=0;attempt<35;attempt++){tangoSolution=generateTangoSolution(tangoSize);if(!tangoSolution)continue;var level=difficulty('#tangoDifficulty'),pairs=[];for(var r=0;r<tangoSize;r++)for(var c=0;c<tangoSize;c++){var i=r*tangoSize+c;if(c+1<tangoSize)pairs.push([i,i+1]);if(r+1<tangoSize)pairs.push([i,i+tangoSize])}shuffle(pairs);var relFactor={easy:2.2,medium:1.38,hard:.78,expert:.48,master:.24}[level],relCount=Math.round(tangoSize*relFactor);tangoRelations=pairs.slice(0,relCount).map(function(p){return{a:p[0],b:p[1],s:tangoSolution[p[0]]===tangoSolution[p[1]]?'=':'×'}});tangoGivens=new Set(range(tangoSize*tangoSize));var target=Math.round(tangoSize*tangoSize*({easy:.34,medium:.2,hard:.1,expert:.06,master:.025}[level])),order=shuffle(range(tangoSize*tangoSize));for(var k=0;k<order.length&&tangoGivens.size>target;k++){var cell=order[k];tangoGivens.delete(cell);if(countTangoSolutions(tangoGivens,tangoRelations,2)!==1)tangoGivens.add(cell)}if(countTangoSolutions(tangoGivens,tangoRelations,2)!==1)continue;var sig=tangoSolution.join('')+'|'+Array.from(tangoGivens).sort(function(a,b){return a-b}).join(',')+'|'+tangoRelations.map(function(x){return x.a+x.s+x.b}).sort().join(',');if(tangoRecent.indexOf(sig)>=0)continue;signatureListPush(tangoRecent,sig,10);return}throw new Error('Unable to generate a unique Tango puzzle')}
+function tangoLogicalAnalysis(solution,givens,relations){
+  var n=tangoSize,half=n/2,values=Array(n*n).fill(0),patterns=tangoValidPatterns(n),waves=0,slowWaves=0,invalid=false,placements={relation:0,balance:0,triple:0,line:0};
+  givens.forEach(function(i){values[i]=solution[i]});
+  function proposal(map,i,value,rule){if(values[i])return;if(solution[i]!==value){invalid=true;return}var old=map.get(i);if(old&&old.value!==value){invalid=true;return}if(!old)map.set(i,{value:value,rule:rule})}
+  function allLines(){var lines=[];for(var r=0;r<n;r++)lines.push(range(n).map(function(c){return r*n+c}));for(var c=0;c<n;c++)lines.push(range(n).map(function(r){return r*n+c}));return lines}
+  var lines=allLines();
+  for(var guard=0;guard<n*n&&!invalid&&values.some(function(v){return !v});guard++){
+    var proposed=new Map();
+    relations.forEach(function(rel){var a=values[rel.a],b=values[rel.b];if(a&&!b)proposal(proposed,rel.b,rel.s==='='?a:3-a,'relation');else if(b&&!a)proposal(proposed,rel.a,rel.s==='='?b:3-b,'relation')});
+    lines.forEach(function(ids){
+      var ones=ids.filter(function(i){return values[i]===1}).length,twos=ids.filter(function(i){return values[i]===2}).length;
+      if(ones===half)ids.forEach(function(i){proposal(proposed,i,2,'balance')});
+      if(twos===half)ids.forEach(function(i){proposal(proposed,i,1,'balance')});
+      for(var k=0;k<n-2;k++){var a=ids[k],b=ids[k+1],c=ids[k+2],va=values[a],vb=values[b],vc=values[c];if(va&&va===vb)proposal(proposed,c,3-va,'triple');if(vb&&vb===vc)proposal(proposed,a,3-vb,'triple');if(va&&va===vc)proposal(proposed,b,3-va,'triple')}
+    });
+    if(!proposed.size){
+      lines.forEach(function(ids){
+        var positions=new Map();ids.forEach(function(i,index){positions.set(i,index)});
+        var candidates=patterns.filter(function(pattern){
+          for(var p=0;p<n;p++)if(values[ids[p]]&&values[ids[p]]!==pattern[p])return false;
+          return relations.every(function(rel){if(!positions.has(rel.a)||!positions.has(rel.b))return true;var a=pattern[positions.get(rel.a)],b=pattern[positions.get(rel.b)];return rel.s==='='?a===b:a!==b})
+        });
+        if(!candidates.length){invalid=true;return}
+        for(var p=0;p<n;p++)if(!values[ids[p]]){var value=candidates[0][p];if(candidates.every(function(pattern){return pattern[p]===value}))proposal(proposed,ids[p],value,'line')}
+      })
+    }
+    if(!proposed.size)break;
+    if(proposed.size<=2)slowWaves++;
+    proposed.forEach(function(item,i){values[i]=item.value;placements[item.rule]++});
+    waves++
+  }
+  var unresolved=values.filter(function(v){return !v}).length,blanks=n*n-givens.size,score=blanks*10+waves*8+slowWaves*12+placements.line*5+placements.triple*2+placements.balance-placements.relation;
+  return{solved:!invalid&&unresolved===0,invalid:invalid,unresolved:unresolved,waves:waves,slowWaves:slowWaves,placements:placements,score:score}
+}
+function chooseTangoRelations(count){
+  var pairs=[];for(var r=0;r<tangoSize;r++)for(var c=0;c<tangoSize;c++){var i=r*tangoSize+c;if(c+1<tangoSize)pairs.push({a:i,b:i+1,axis:'h'});if(r+1<tangoSize)pairs.push({a:i,b:i+tangoSize,axis:'v'})}
+  var chosen=[],degree=Array(tangoSize*tangoSize).fill(0),covered=new Set(),horizontal=0,vertical=0;
+  while(chosen.length<count&&pairs.length){
+    shuffle(pairs);pairs.sort(function(a,b){function value(p){var fresh=(covered.has(p.a)?0:1)+(covered.has(p.b)?0:1),balance=p.axis==='h'?vertical-horizontal:horizontal-vertical;return fresh*100-(degree[p.a]+degree[p.b])*18+balance*4}return value(b)-value(a)});
+    var windowSize=Math.min(3,pairs.length),pick=pairs.splice(randInt(windowSize),1)[0];chosen.push(pick);degree[pick.a]++;degree[pick.b]++;covered.add(pick.a);covered.add(pick.b);if(pick.axis==='h')horizontal++;else vertical++
+  }
+  return chosen.map(function(p){return{a:p.a,b:p.b,s:tangoSolution[p.a]===tangoSolution[p.b]?'=':'×'}})
+}
+function captureTangoCandidate(analysis){return{solution:tangoSolution.slice(),givens:Array.from(tangoGivens),relations:tangoRelations.map(function(rel){return Object.assign({},rel)}),analysis:analysis}}
+function applyTangoCandidate(candidate){tangoSolution=candidate.solution.slice();tangoGivens=new Set(candidate.givens);tangoRelations=candidate.relations.map(function(rel){return Object.assign({},rel)})}
+function buildTangoCandidate(config){
+  tangoSolution=generateTangoSolution(tangoSize);if(!tangoSolution)return null;
+  tangoRelations=chooseTangoRelations(config.relations);tangoGivens=new Set(range(tangoSize*tangoSize));
+  var order=shuffle(range(tangoSize*tangoSize));
+  for(var k=0;k<order.length&&tangoGivens.size>config.givens;k++){
+    var cell=order[k];tangoGivens.delete(cell);var analysis=tangoLogicalAnalysis(tangoSolution,tangoGivens,tangoRelations);
+    if(!analysis.solved||countTangoSolutions(tangoGivens,tangoRelations,2)!==1)tangoGivens.add(cell)
+  }
+  var finalAnalysis=tangoLogicalAnalysis(tangoSolution,tangoGivens,tangoRelations);if(!finalAnalysis.solved||countTangoSolutions(tangoGivens,tangoRelations,2)!==1)return null;
+  return captureTangoCandidate(finalAnalysis)
+}
+function buildTangoPuzzle(){
+  var level=difficulty('#tangoDifficulty'),config=tangoDifficultyConfig(),scoreTarget=TANGO_SCORE_TARGETS[tangoSize][level],choices=[],fallbacks=[],seen=new Set(),poolTarget=14,attempt=0;
+  for(;attempt<100&&choices.length<poolTarget;attempt++){
+    var candidate=buildTangoCandidate(config);if(!candidate)continue;
+    var sig=candidate.solution.join('')+'|'+candidate.givens.slice().sort(function(a,b){return a-b}).join(',')+'|'+candidate.relations.map(function(x){return x.a+x.s+x.b}).sort().join(',');
+    if(seen.has(sig)||tangoRecent.indexOf(sig)>=0)continue;seen.add(sig);candidate.sig=sig;candidate.excess=candidate.givens.length-config.givens;fallbacks.push(candidate);if(candidate.excess<=1)choices.push(candidate)
+  }
+  var pool=choices.length?choices:fallbacks;if(!pool.length)throw new Error('Unable to generate a calibrated Tango puzzle');
+  pool.sort(function(a,b){return Math.abs(a.analysis.score-scoreTarget)-Math.abs(b.analysis.score-scoreTarget)||a.excess-b.excess||a.analysis.score-b.analysis.score});
+  var band=pool.slice(0,Math.min(3,pool.length)),chosen=band[randInt(band.length)];
+  applyTangoCandidate(chosen);signatureListPush(tangoRecent,chosen.sig,12);
+  tangoLastGenerationStats={size:tangoSize,difficulty:level,attempts:attempt,candidates:pool.length,exactBand:choices.length,targetGivens:config.givens,givens:tangoGivens.size,relations:tangoRelations.length,targetScore:scoreTarget,scoreDelta:chosen.analysis.score-scoreTarget,logical:chosen.analysis}
+}
 function tangoBad(){var bad=new Set(),half=tangoSize/2;function mark(ids){var vals=ids.map(function(i){return tangoValues[i]});[1,2].forEach(function(v){if(vals.filter(function(x){return x===v}).length>half)ids.forEach(function(i){if(tangoValues[i]===v)bad.add(i)})});for(var k=0;k<vals.length-2;k++)if(vals[k]&&vals[k]===vals[k+1]&&vals[k]===vals[k+2]){bad.add(ids[k]);bad.add(ids[k+1]);bad.add(ids[k+2])}}for(var r=0;r<tangoSize;r++)mark(range(tangoSize).map(function(c){return r*tangoSize+c}));for(var c=0;c<tangoSize;c++)mark(range(tangoSize).map(function(r){return r*tangoSize+c}));tangoRelations.forEach(function(rel){var a=tangoValues[rel.a],b=tangoValues[rel.b];if(a&&b&&((rel.s==='='&&a!==b)||(rel.s==='×'&&a===b))){bad.add(rel.a);bad.add(rel.b)}});return bad}
 function tangoComplete(){return tangoValues.every(Boolean)&&tangoBad().size===0&&tangoValues.every(function(v,i){return v===tangoSolution[i]})}
 function renderTango(){var grid=q('#tangoGrid'),bad=tangoBad();grid.innerHTML='';grid.style.setProperty('--tango-size',tangoSize);grid.style.gridTemplateColumns='repeat('+tangoSize+',1fr)';q('#tangoWrap').dataset.size=tangoSize;for(var i=0;i<tangoSize*tangoSize;i++){var r=Math.floor(i/tangoSize),c=i%tangoSize,b=document.createElement('button');b.type='button';b.dataset.i=i;b.disabled=tangoGivens.has(i);b.className='tango-cell'+(tangoValues[i]===1?' sun':tangoValues[i]===2?' moon':'')+(tangoGivens.has(i)?' given':'')+(bad.has(i)?' conflict':'');b.textContent=tangoValues[i]===1?'☀':tangoValues[i]===2?'●':'';b.style.borderTopWidth='0';b.style.borderLeftWidth='0';b.style.borderRightWidth=c===tangoSize-1?'0':'1px';b.style.borderBottomWidth=r===tangoSize-1?'0':'1px';b.style.borderStyle='solid';grid.appendChild(b)}var layer=q('#tangoRelations');layer.innerHTML='';tangoRelations.forEach(function(rel){var ar=Math.floor(rel.a/tangoSize),ac=rel.a%tangoSize,br=Math.floor(rel.b/tangoSize),bc=rel.b%tangoSize,x=((ac+bc+1)/2)/tangoSize*100,y=((ar+br+1)/2)/tangoSize*100,d=document.createElement('span');d.className='tango-relation';d.textContent=rel.s;d.style.left=x+'%';d.style.top=y+'%';if(tangoSize===8){d.style.width='17px';d.style.height='17px';d.style.fontSize='.58rem'}layer.appendChild(d)})}
@@ -923,7 +998,9 @@ window.__dailyGamesDebug={
   getPatchGenerationStats:function(){return patchLastGenerationStats&&Object.assign({},patchLastGenerationStats)},
   getSudoku:function(){return{size:sudokuSize,puzzle:sudokuPuzzle.slice(),solution:sudokuSolution.slice()}},
   getSudokuGenerationStats:function(){return sudokuLastGenerationStats&&Object.assign({},sudokuLastGenerationStats)},
-  getTango:function(){return{size:tangoSize,solution:tangoSolution.slice(),givens:Array.from(tangoGivens),relations:tangoRelations.slice()}}
+  getTango:function(){return{size:tangoSize,solution:tangoSolution.slice(),givens:Array.from(tangoGivens),relations:tangoRelations.slice()}},
+  analyzeTango:function(){return tangoLogicalAnalysis(tangoSolution,tangoGivens,tangoRelations)},
+  getTangoGenerationStats:function(){return tangoLastGenerationStats&&Object.assign({},tangoLastGenerationStats)}
 };
 if('serviceWorker' in navigator&&window.isSecureContext){
   window.addEventListener('load',function(){

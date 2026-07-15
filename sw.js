@@ -1,4 +1,4 @@
-var CACHE_NAME='puzzle-games-v4-mobile-win';
+var CACHE_NAME='puzzle-games-v5-difficulty-calibration';
 var APP_SHELL_URLS=[
   'assets/app.css',
   'assets/app.js',
@@ -16,8 +16,8 @@ var OFFLINE_URLS=[
   'tango.html',
   'pinpoint.html',
   'crossclimb.html',
-  'assets/app.css?v=20260714-1',
-  'assets/app.js?v=20260714-1'
+  'assets/app.css?v=20260715-1',
+  'assets/app.js?v=20260715-1'
 ];
 
 self.addEventListener('install',function(event){
