@@ -1,7 +1,9 @@
-var CACHE_NAME='puzzle-games-v5-difficulty-calibration';
+var CACHE_NAME='puzzle-games-v6-stars';
 var APP_SHELL_URLS=[
   'assets/app.css',
   'assets/app.js',
+  'assets/stars-core.js',
+  'assets/stars.js',
   'sw.js'
 ];
 var OFFLINE_URLS=[
@@ -11,13 +13,16 @@ var OFFLINE_URLS=[
   'minisudoku.html',
   'sudoku.html',
   'queens.html',
+  'stars.html',
   'wend.html',
   'zip.html',
   'tango.html',
   'pinpoint.html',
   'crossclimb.html',
-  'assets/app.css?v=20260715-1',
-  'assets/app.js?v=20260715-1'
+  'assets/app.css?v=20260802-1',
+  'assets/app.js?v=20260802-1',
+  'assets/stars-core.js?v=20260802-1',
+  'assets/stars.js?v=20260802-1'
 ];
 
 self.addEventListener('install',function(event){

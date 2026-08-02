@@ -28,6 +28,10 @@ document.body.insertAdjacentHTML('afterbegin',`
         <span class="game-copy"><span class="game-kicker">Regions</span><span class="game-name">Queens</span></span>
         <span class="game-art art-queens" aria-hidden="true"><span class="hub-icon queens-icon"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span>
       </a>
+      <a class="game-launch" data-game="stars" href="stars.html">
+        <span class="game-copy"><span class="game-kicker">Regions</span><span class="game-name">Stars</span></span>
+        <span class="game-art art-stars" aria-hidden="true"><span class="hub-icon stars-icon"><i>★</i><i></i><i></i><i>★</i></span></span>
+      </a>
       <a class="game-launch under-construction" data-game="pinpoint" href="pinpoint.html" aria-disabled="true">
         <span class="game-copy"><span class="game-kicker">Clues</span><span class="game-name">Pinpoint</span><span class="construction-badge">Under construction</span></span>
         <span class="game-art art-pinpoint" aria-hidden="true"><span class="hub-icon pinpoint-icon"></span></span>
@@ -52,6 +56,20 @@ document.body.insertAdjacentHTML('afterbegin',`
   <aside class="card side"><h2>Rules</h2><ol class="rules"><li>Place exactly one queen in every row.</li><li>Place exactly one queen in every column.</li><li>Place exactly one queen in every colored region.</li><li>Queens cannot touch, including diagonally.</li></ol><div class="legend"><span><b>×</b> impossible</span><span><b>♛</b> queen</span><span><b class="mock-legend">×/♛</b> mock</span></div><div class="settings"><h2>Settings</h2><div class="setting"><label for="autoCheck">Auto-check<small>Highlight rule violations</small></label><input class="switch" id="autoCheck" type="checkbox" checked></div><div class="setting"><label for="autoXs">Auto-place X's<small>Mark cells blocked by queens</small></label><input class="switch" id="autoXs" type="checkbox" checked></div></div><div class="meta"><span class="badge">No guessing required</span></div></aside>
 </div>
 
+</section>
+<section class="game-screen" id="starsScreen" hidden><button class="suite-back" data-home type="button">‹ All games</button>
+<div class="app">
+  <main class="card main">
+    <div class="topbar"><div class="title"><div class="logo">★</div><div><h1>Stars</h1><div class="subtitle">Place two stars in every row, column, and region</div></div></div><div class="timer" id="starsTimer">00:00</div></div>
+    <div class="size-control queens-controls"><label for="starsBoardSize">Board size</label><select id="starsBoardSize"><option value="4" disabled>4×4 — impossible</option><option value="5" disabled>5×5 — impossible</option><option value="6" disabled>6×6 — impossible</option><option value="7" disabled>7×7 — impossible</option><option value="8" selected>8×8</option><option value="9">9×9</option><option value="10">10×10</option><option value="11">11×11</option><option value="12">12×12</option><option value="13">13×13</option><option value="14">14×14</option><option value="15">15×15</option></select><label for="starsDifficulty">Difficulty</label><select id="starsDifficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option><option value="expert">Expert</option><option value="master">Master</option></select><button id="starsStart">Start</button><span class="size-help">Two non-touching stars per line are mathematically possible from 8×8 upward.</span></div>
+    <div class="board-shell"><div class="col-labels" id="starsColLabels" aria-hidden="true"></div><div class="row-labels" id="starsRowLabels" aria-hidden="true"></div><div class="board-wrap"><div class="board stars-board" id="starsBoard" role="grid" aria-label="Stars board"></div><div class="generating" id="starsGenerating"><div><div class="spinner"></div>Generating and verifying a unique Stars puzzle…</div></div></div></div>
+    <div class="status" id="starsStatus" aria-live="polite">Click: empty → × → star. Drag across cells to paint X marks.</div>
+    <div class="mock-tools"><button class="mock-toggle" id="starsMockMode" type="button" aria-pressed="false">Mock mode: Off</button><button id="starsClearMocks" type="button" disabled>Clear mocks</button><div class="mock-help" id="starsMockHelp">Turn on Mock mode to test stars and X marks without changing your real board.</div></div>
+    <section class="stars-hint-panel" id="starsHintPanel" aria-labelledby="starsHintTitle" hidden><div class="stars-hint-head"><div><span class="stars-hint-kicker">Interactive hint</span><h2 id="starsHintTitle">Follow the deduction</h2></div><button id="starsCloseHint" type="button" aria-label="Close hint">×</button></div><div class="stars-hint-summary" id="starsHintSummary"></div><ol class="stars-hint-steps" id="starsHintSteps"></ol></section>
+    <div class="actions"><button id="starsUndo">Undo</button><button id="starsClear">Clear</button><button id="starsMistakes">Show mistakes</button><button id="starsHint">Hint</button><button class="primary" id="starsNewGame">New game</button></div>
+  </main>
+  <aside class="card side"><h2>Rules</h2><ol class="rules"><li>Place exactly two stars in every row.</li><li>Place exactly two stars in every column.</li><li>Place exactly two stars in every outlined region.</li><li>Stars cannot touch, including diagonally.</li></ol><div class="legend"><span><b>×</b> impossible</span><span><b>★</b> star</span></div><div class="settings"><h2>Settings</h2><div class="setting"><label for="starsAutoCheck">Auto-check<small>Highlight rule violations</small></label><input class="switch" id="starsAutoCheck" type="checkbox" checked></div><div class="setting"><label for="starsAutoXs">Auto-place X's<small>Mark cells blocked by completed units and stars</small></label><input class="switch" id="starsAutoXs" type="checkbox" checked></div></div><div class="meta"><span class="badge">Unique · unlimited hints</span></div></aside>
+</div>
 </section>
 <section class="game-screen mini-game-screen" id="wendScreen" hidden>
   <button class="suite-back" data-home type="button">‹ All games</button>
@@ -83,6 +101,7 @@ document.body.insertAdjacentHTML('afterbegin',`
 </section>
 
 <div class="win" id="win" role="dialog" aria-modal="true" aria-labelledby="queensWinTitle" aria-hidden="true"><div class="win-card"><div class="win-crown">♛</div><h2 id="queensWinTitle">Puzzle solved</h2><p id="winText"></p><div class="row"><button id="closeWin">View board</button><button class="primary" id="winNew">New game</button></div></div></div>
+<div class="win" id="starsWin" role="dialog" aria-modal="true" aria-labelledby="starsWinTitle" aria-hidden="true"><div class="win-card"><div class="win-crown">★</div><h2 id="starsWinTitle">Puzzle solved</h2><p id="starsWinText"></p><div class="row"><button id="starsCloseWin">View board</button><button class="primary" id="starsWinNew">New game</button></div></div></div>
 <div class="win suite-win" id="suiteWin" role="dialog" aria-modal="true" aria-labelledby="suiteWinTitle" aria-hidden="true"><div class="win-card"><div class="win-crown" id="suiteWinIcon">✓</div><h2 id="suiteWinTitle">Puzzle solved</h2><p id="suiteWinText"></p><div class="row"><button id="suiteWinHome" type="button">All games</button><button class="primary" id="suiteWinAgain" type="button">Play again</button></div></div></div>
 `);
 
