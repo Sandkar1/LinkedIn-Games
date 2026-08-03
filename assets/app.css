@@ -686,6 +686,10 @@ html.win-open,body.win-open{overflow:hidden;overscroll-behavior:none}
 .win p{margin:.55rem 0;color:var(--muted)}
 .win .row{display:flex;gap:9px;justify-content:center;margin-top:18px}
 .win .row button{min-width:120px}
+.clear-confirm.win-opening .win-card{pointer-events:auto}
+.clear-confirm .win-card{width:min(92vw,390px)}
+.clear-confirm-icon{width:64px;height:64px;margin:0 auto 12px;display:grid;place-items:center;border:1px solid #f0c2bc;border-radius:20px;color:var(--danger);background:var(--danger-soft);font-size:2.35rem;font-weight:850;line-height:1}
+.clear-confirm button.danger{color:#fffaf0;border-color:#941f17;background:linear-gradient(180deg,#c43a2e,var(--danger));box-shadow:0 7px 16px rgba(180,35,24,.2),inset 0 1px rgba(255,250,240,.2)}
 @keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes queenIn{0%{opacity:.2;transform:translate(-50%,-50%) scale(.62)}70%{opacity:1;transform:translate(-50%,-50%) scale(1.06)}100%{transform:translate(-50%,-50%) scale(1)}}
 @keyframes xIn{from{opacity:.2;scale:.5}to{opacity:1;scale:1}}

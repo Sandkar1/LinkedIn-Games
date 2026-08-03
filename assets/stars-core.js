@@ -15,8 +15,19 @@
     14:[[0,2],[4,6],[0,2],[4,6],[1,8],[3,5],[1,9],[11,13],[7,9],[11,13],[3,7],[10,12],[5,8],[10,12]],
     15:[[0,2],[4,6],[0,2],[4,6],[1,8],[3,5],[1,7],[3,10],[12,14],[8,10],[12,14],[5,9],[11,13],[7,9],[11,13]]
   };
+  var VERIFIED_START_SEEDS={
+    8:{7:1,6:2,5:3,4:2,3:1},
+    9:{8:1,7:1,6:1,5:1,4:1},
+    10:{9:1,8:1,7:1,6:4,5:8},
+    11:{10:4,9:2,8:6,7:6,6:17},
+    12:{11:1,10:1,9:1,8:26,7:10},
+    13:{12:3,11:3,10:3,9:187,8:3},
+    14:{13:1,12:1,11:4,10:1,9:76},
+    15:{14:239,13:239,12:239,11:558}
+  };
 
   function randomInt(max,rng){return Math.floor((rng||Math.random)()*max)}
+  function seededRandom(seed){var value=seed>>>0;return function(){value=(Math.imul(value,1664525)+1013904223)>>>0;return value/4294967296}}
   function shuffle(list,rng){rng=rng||Math.random;for(var i=list.length-1;i>0;i--){var j=randomInt(i+1,rng),v=list[i];list[i]=list[j];list[j]=v}return list}
   function range(n){return Array.from({length:n},function(_,i){return i})}
   function orthogonalNeighbors(i,n){var r=Math.floor(i/n),c=i%n,out=[];if(r>0)out.push(i-n);if(r<n-1)out.push(i+n);if(c>0)out.push(i-1);if(c<n-1)out.push(i+1);return out}
@@ -191,6 +202,58 @@
     }
   }
 
+  function traceContradiction(map,n,initial,maxEvents){
+    var context=buildContext(map,n),state=Array.isArray(initial)&&initial.length===n*n?initial.slice():Array(n*n).fill(0),events=[],limit=maxEvents||160;if(!context)return{contradiction:true,events:events,state:state,conflict:{rule:'invalid-board',state:state.slice()}};
+    function finish(event){event.state=state.slice();events.push(event);return{contradiction:true,events:events,state:state,conflict:event}}
+    while(events.length<limit){
+      var stars=[];for(var i=0;i<state.length;i++)if(state[i]===2)stars.push(i);
+      for(var a=0;a<stars.length;a++)for(var b=a+1;b<stars.length;b++)if(touches(stars[a],stars[b],n))return finish({kind:'conflict',rule:'touching',cells:[stars[a],stars[b]],area:[stars[a],stars[b]],targets:[stars[a],stars[b]]});
+      for(var u=0;u<context.units.length;u++){
+        var unit=context.units[u],unitStars=unit.filter(function(cell){return state[cell]===2}),open=unit.filter(function(cell){return state[cell]===0});
+        if(unitStars.length>2)return finish({kind:'conflict',rule:'too-many',unitIndex:u,cells:unitStars.slice(),area:unit.slice(),targets:unitStars.slice(),stars:unitStars.length,open:open.length});
+        if(unitStars.length+open.length<2)return finish({kind:'conflict',rule:'too-few',unitIndex:u,cells:unitStars.concat(open),area:unit.slice(),targets:unitStars.concat(open),stars:unitStars.length,open:open.length});
+        if(unitStars.length<2&&unitStars.length+open.length>=2){var placements=legalUnitCombinations(unit,state,2-unitStars.length,n);if(!placements.combinations.length)return finish({kind:'conflict',rule:'no-placement',unitIndex:u,cells:open.slice(),area:unit.slice(),targets:open.slice(),stars:unitStars.length,open:open.length,need:2-unitStars.length})}
+      }
+      var changed=false;
+      for(i=0;i<stars.length&&!changed;i++){
+        var star=stars[i],near=context.neighbors[star].filter(function(cell){return state[cell]===0});if(!near.length)continue;near.forEach(function(cell){state[cell]=1});events.push({kind:'deduction',rule:'no-touch',source:[star],assigned:near.slice(),value:1,area:[star].concat(context.neighbors[star]),targets:[star].concat(near),state:state.slice()});changed=true
+      }
+      if(changed)continue;
+      for(u=0;u<context.units.length&&!changed;u++){
+        unit=context.units[u];unitStars=unit.filter(function(cell){return state[cell]===2});open=unit.filter(function(cell){return state[cell]===0});
+        if(unitStars.length===2&&open.length){open.forEach(function(cell){state[cell]=1});events.push({kind:'deduction',rule:'unit-full',unitIndex:u,source:unitStars.slice(),assigned:open.slice(),value:1,area:unit.slice(),targets:unitStars.concat(open),state:state.slice()});changed=true}
+        else if(unitStars.length<2&&unitStars.length+open.length===2&&open.length){open.forEach(function(cell){state[cell]=2});events.push({kind:'deduction',rule:'unit-fill',unitIndex:u,source:unitStars.slice(),assigned:open.slice(),value:2,area:unit.slice(),targets:unitStars.concat(open),state:state.slice()});changed=true}
+      }
+      if(!changed)return{contradiction:false,events:events,state:state,stalled:true}
+    }
+    return{contradiction:false,events:events,state:state,truncated:true}
+  }
+
+  function branchChoice(state,context,n){
+    var best=null;for(var u=0;u<context.units.length;u++){var unit=context.units[u],stars=unit.reduce(function(total,i){return total+(state[i]===2?1:0)},0),need=2-stars;if(need<=0)continue;var data=legalUnitCombinations(unit,state,need,n);if(!data.combinations.length)return null;if(!best||data.combinations.length<best.combinations.length)best={unitIndex:u,open:data.open,combinations:data.combinations}}
+    return best
+  }
+
+  function contradictionPath(map,n,initial,nodeLimit){
+    var context=buildContext(map,n),nodes=0,limit=nodeLimit||12000;
+    function walk(input,depth){
+      if(++nodes>limit)return null;var traced=traceContradiction(map,n,input,160);if(traced.contradiction)return traced.events;if(traced.truncated||traced.state.every(Boolean))return null;var branch=branchChoice(traced.state,context,n);if(!branch)return null;
+      for(var c=0;c<branch.combinations.length;c++){
+        var chosen=branch.combinations[c],chosenSet=new Set(chosen),next=traced.state.slice();branch.open.forEach(function(cell){next[cell]=chosenSet.has(cell)?2:1});var event={kind:'branch',rule:'branch',unitIndex:branch.unitIndex,chosen:chosen.slice(),rejected:branch.open.filter(function(cell){return!chosenSet.has(cell)}),area:context.units[branch.unitIndex].slice(),targets:branch.open.slice(),state:next.slice(),depth:depth},tail=walk(next,depth+1);if(tail)return traced.events.concat([event],tail)
+      }
+      return null
+    }
+    return{events:walk(initial,0)||[],nodes:nodes,truncated:nodes>limit}
+  }
+
+  function analyzeContradiction(map,n,initial,nodeLimit,maxBranches){
+    nodeLimit=nodeLimit||160000;maxBranches=maxBranches||8;var context=buildContext(map,n),root=traceContradiction(map,n,initial,160);if(root.contradiction)return{contradiction:true,direct:true,root:root,branches:[],allBranches:0};if(root.truncated||!context)return{contradiction:false,root:root,branches:[],truncated:true};var branch=branchChoice(root.state,context,n);if(!branch)return{contradiction:false,root:root,branches:[]};
+    var branches=[],allFail=true,shown=Math.min(branch.combinations.length,maxBranches);for(var c=0;c<branch.combinations.length;c++){
+      var chosen=branch.combinations[c],chosenSet=new Set(chosen),next=root.state.slice();branch.open.forEach(function(cell){next[cell]=chosenSet.has(cell)?2:1});var proof=solve(map,n,1,next,nodeLimit);if(proof.truncated||proof.count){allFail=false;if(c<shown)branches.push({chosen:chosen.slice(),rejected:branch.open.filter(function(cell){return!chosenSet.has(cell)}),state:next.slice(),proof:proof,path:[]});continue}if(c<shown){var path=contradictionPath(map,n,next,Math.min(nodeLimit,18000));branches.push({chosen:chosen.slice(),rejected:branch.open.filter(function(cell){return!chosenSet.has(cell)}),state:next.slice(),proof:proof,path:path.events})}
+    }
+    return{contradiction:allFail,direct:false,root:root,unitIndex:branch.unitIndex,open:branch.open.slice(),allBranches:branch.combinations.length,branches:branches,truncated:branch.combinations.length>maxBranches}
+  }
+
   function combinations(list,count,callback,start,picked){
     start=start||0;picked=picked||[];
     if(picked.length===count){callback(picked.slice());return}
@@ -227,18 +290,59 @@
   }
 
   function solutionState(solution,n){var state=Array(n*n).fill(1);for(var r=0;r<n;r++)solution[r].forEach(function(c){state[r*n+c]=2});return state}
-  function candidateScore(result,map,n){var boundary=boundarySignature(map,n).reduce(function(a,b){return a+b},0);return Math.log2(result.nodes+1)*8+result.maxDepth*5+result.branches*.08+boundary/(n*n)}
+  function regionProfile(map,n){
+    var sizes=Array(n).fill(0),options=Array(n).fill(0),cells=Array.from({length:n},function(){return[]});
+    map.forEach(function(rid,i){sizes[rid]++;cells[rid].push(i)});
+    for(var rid=0;rid<n;rid++)for(var a=0;a<cells[rid].length;a++)for(var b=a+1;b<cells[rid].length;b++)if(!touches(cells[rid][a],cells[rid][b],n))options[rid]++;
+    var forcedIds=[],tightIds=[];for(rid=0;rid<n;rid++){if(options[rid]===1)forcedIds.push(rid);if(options[rid]<=3)tightIds.push(rid)}
+    return{sizes:sizes,options:options,forcedIds:forcedIds,tightIds:tightIds,forcedRegions:forcedIds.length,tightRegions:tightIds.length,tinyRegions:sizes.filter(function(size){return size<=3}).length,averageOptions:options.reduce(function(a,b){return a+b},0)/n}
+  }
+  function solverEffort(result){return Math.log2(result.nodes+1)*18+result.maxDepth*13+Math.log2(result.branches+1)*9}
+  function candidateScore(result,map,n){var boundary=boundarySignature(map,n).reduce(function(a,b){return a+b},0),profile=regionProfile(map,n);return solverEffort(result)+profile.averageOptions*1.5+boundary/(n*n)-profile.forcedRegions*110-profile.tightRegions*12}
+  function evolutionValue(result,profile,n,rank){
+    var forcedAllowance=[Math.max(2,Math.ceil(n/4)),0,0,0,0][rank],tightAllowance=[Math.ceil(n*.75),Math.ceil(n*.42),Math.ceil(n*.22),Math.ceil(n*.1),0][rank],forcedExcess=Math.max(0,profile.forcedRegions-forcedAllowance),tightExcess=Math.max(0,profile.tightRegions-tightAllowance),weights=[.12,.36,.72,1.12,1.65];
+    return solverEffort(result)*weights[rank]+profile.averageOptions*(2+rank)-forcedExcess*2200-tightExcess*180-profile.tinyRegions*90
+  }
+  function connectedAfterMove(map,n,cell,from,to){
+    var trial=map.slice();trial[cell]=to;var first=trial.indexOf(from);if(first<0)return null;var seen=new Set([first]),stack=[first];while(stack.length){var at=stack.pop();orthogonalNeighbors(at,n).forEach(function(next){if(trial[next]===from&&!seen.has(next)){seen.add(next);stack.push(next)}})}
+    return seen.size===trial.filter(function(rid){return rid===from}).length?trial:null
+  }
+  function mutationMoves(map,state,n,profile,rng){
+    var moves=[],forced=new Set(profile.forcedIds),tight=new Set(profile.tightIds),seen=new Set();
+    for(var cell=0;cell<map.length;cell++){
+      if(state[cell]===2)continue;var from=map[cell];if(profile.sizes[from]<=3)continue;
+      var destinations=Array.from(new Set(orthogonalNeighbors(cell,n).map(function(next){return map[next]}).filter(function(rid){return rid!==from})));
+      for(var d=0;d<destinations.length;d++){
+        var to=destinations[d],key=cell+':'+to;if(seen.has(key))continue;seen.add(key);var trial=connectedAfterMove(map,n,cell,from,to);if(!trial)continue;
+        var priority=(forced.has(to)?5000:0)+(tight.has(to)?700:0)-(forced.has(from)?1400:0)+(profile.sizes[from]-profile.sizes[to])*16+rng()*90;moves.push({map:trial,priority:priority})
+      }
+    }
+    moves.sort(function(a,b){return b.priority-a.priority});return moves
+  }
+  function evolveLayout(map,state,n,rng,rank,initialResult){
+    rank=Math.max(0,Math.min(4,rank|0));var current={map:map.slice(),result:initialResult,profile:regionProfile(map,n)},accepted=0,trials=0,rounds=(n>=13?[7,16,20,22,24]:[Math.max(5,Math.ceil(n*.65)),n+4,Math.min(18,n+7),Math.min(21,n+9),Math.min(24,n+12)])[rank],probeLimit=(n>=13?[2,2,2,3,3]:[2,3,3,3,3])[rank],mutationNodeLimit=(n>=13?[500,800,1200,1800,2600]:[350,550,800,1100,1600])[rank];current.value=evolutionValue(current.result,current.profile,n,rank);var best=current;
+    for(var round=0;round<rounds;round++){
+      var moves=mutationMoves(current.map,state,n,current.profile,rng);if(!moves.length)break;var roundBest=null,probes=Math.min(probeLimit,moves.length);
+      for(var p=0;p<probes;p++){
+        var choice=p<Math.ceil(probes*.7)?p:randomInt(Math.min(moves.length,Math.max(probes,18)),rng),nextMap=moves[choice].map,nextProfile=regionProfile(nextMap,n),nextResult=solve(nextMap,n,2,null,mutationNodeLimit);trials++;
+        if(nextResult.truncated||nextResult.count!==1)continue;var value=evolutionValue(nextResult,nextProfile,n,rank),entry={map:nextMap,result:nextResult,profile:nextProfile,value:value};if(!roundBest||entry.value>roundBest.value)roundBest=entry
+      }
+      if(!roundBest)continue;
+      var plateau=roundBest.value>=current.value-.01,explore=rank>=2&&rng()<.035;if(plateau||explore){current=roundBest;accepted++;if(current.value>best.value)best=current}
+    }
+    return{map:best.map,result:best.result,profile:best.profile,accepted:accepted,trials:trials}
+  }
   function transformBoard(map,state,n,rng){
     rng=rng||Math.random;var mirror=rng()<.5,turns=randomInt(4,rng),nextMap=Array(n*n),nextState=Array(n*n);
     function point(r,c){if(mirror)c=n-1-c;for(var t=0;t<turns;t++){var old=r;r=c;c=n-1-old}return[r,c]}
     for(var r=0;r<n;r++)for(var c=0;c<n;c++){var p=point(r,c),to=p[0]*n+p[1],from=r*n+c;nextMap[to]=map[from];nextState[to]=state[from]}
     return{map:relabelRegions(nextMap,n,rng),state:nextState}
   }
-  function makeCandidate(n,rng,irregularity,anchorTarget){
-    var anchored=anchorTarget?makeAnchoredLayout(n,rng,anchorTarget):null,map=anchorTarget?(anchored&&anchored.map):makeRandomLayout(n,rng,irregularity);if(!map)return null;
+  function makeCandidate(n,rng,irregularity,anchorTarget,difficultyRank){
+    rng=rng||Math.random;var verifiedSeed=VERIFIED_START_SEEDS[n]&&VERIFIED_START_SEEDS[n][anchorTarget],startRng=verifiedSeed==null?rng:seededRandom(verifiedSeed),anchored=anchorTarget?makeAnchoredLayout(n,startRng,anchorTarget):null,map=anchorTarget?(anchored&&anchored.map):makeRandomLayout(n,rng,irregularity);if(!map)return null;
     var result=solve(map,n,2,null,500000);if(result.truncated||result.count!==1)return null;
-    var transformed=transformBoard(map,result.solution,n,rng),verified=solve(transformed.map,n,2,null,500000);if(verified.truncated||verified.count!==1)return null;
-    return{map:transformed.map,solution:verified.solution,solutionPairs:stateToPairs(verified.solution,n),score:candidateScore(verified,transformed.map,n),stats:verified}
+    var rank=difficultyRank==null?2:Math.max(0,Math.min(4,difficultyRank|0)),evolved=evolveLayout(map,result.solution,n,rng,rank,result),tightCaps=[n,n,Math.ceil(n*.45),Math.ceil(n*.3),Math.ceil(n*.22)];if(rank>0&&evolved.profile.forcedRegions||rank>=2&&evolved.profile.tightRegions>tightCaps[rank])return null;map=evolved.map;result=evolved.result;
+    var transformed=transformBoard(map,result.solution,n,rng),verified=Object.assign({},result,{solution:transformed.state,evolutionAccepted:evolved.accepted,evolutionTrials:evolved.trials}),profile=regionProfile(transformed.map,n);return{map:transformed.map,solution:transformed.state,solutionPairs:stateToPairs(transformed.state,n),score:candidateScore(verified,transformed.map,n),stats:verified,profile:profile}
   }
   function stateToPairs(state,n){var out=[];for(var r=0;r<n;r++){var pair=[];for(var c=0;c<n;c++)if(state[r*n+c]===2)pair.push(c);out.push(pair)}return out}
   function boundarySignature(map,n){var out=[];for(var r=0;r<n;r++)for(var c=0;c<n-1;c++){var i=r*n+c;out.push(map[i]===map[i+1]?0:1)}for(c=0;c<n;c++)for(r=0;r<n-1;r++){i=r*n+c;out.push(map[i]===map[i+n]?0:1)}return out}
@@ -247,9 +351,9 @@
   function distance(a,b){return{boundary:hamming(a.boundary,b.boundary),stars:hamming(a.stars,b.stars)}}
 
   return{
-    MIN_SIZE:8,MAX_SIZE:15,BASE_SOLUTIONS:BASE_SOLUTIONS,shuffle:shuffle,orthogonalNeighbors:orthogonalNeighbors,touchingNeighbors:touchingNeighbors,touches:touches,
+    MIN_SIZE:8,MAX_SIZE:15,BASE_SOLUTIONS:BASE_SOLUTIONS,VERIFIED_START_SEEDS:VERIFIED_START_SEEDS,seededRandom:seededRandom,shuffle:shuffle,orthogonalNeighbors:orthogonalNeighbors,touchingNeighbors:touchingNeighbors,touches:touches,
     validSolution:validSolution,makeSolution:makeSolution,validRegionMap:validRegionMap,makeRegions:makeRegions,makeRandomLayout:makeRandomLayout,makeAnchoredLayout:makeAnchoredLayout,buildContext:buildContext,propagate:propagate,
-    legalUnitCombinations:legalUnitCombinations,solve:solve,makeCandidate:makeCandidate,stateToPairs:stateToPairs,solutionState:solutionState,
+    legalUnitCombinations:legalUnitCombinations,solve:solve,traceContradiction:traceContradiction,contradictionPath:contradictionPath,analyzeContradiction:analyzeContradiction,makeCandidate:makeCandidate,stateToPairs:stateToPairs,solutionState:solutionState,regionProfile:regionProfile,evolveLayout:evolveLayout,
     boundarySignature:boundarySignature,record:record,distance:distance,hamming:hamming
   };
 });

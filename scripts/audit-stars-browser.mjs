@@ -31,6 +31,11 @@ async function waitFor(expression,timeout=30000){
 
 await call('Runtime.enable');
 await call('Page.enable');
+await call('Network.enable');
+await call('Network.setBypassServiceWorker',{bypass:true});
+await call('Network.setCacheDisabled',{cacheDisabled:true});
+await call('Page.navigate',{url:'http://127.0.0.1:8765/stars.html'});
+await new Promise(resolve=>setTimeout(resolve,200));
 await call('Page.reload',{ignoreCache:true});
 await new Promise(resolve=>setTimeout(resolve,200));
 runtimeErrors.length=0;
@@ -50,11 +55,16 @@ for(const size of [8,9,10,11,12,13,14,15]){
   await evaluate(`document.querySelector('#starsBoardSize').value='${size}';document.querySelector('#starsStart').click();true`);
   await waitFor(`window.__starsDebug.getGenerationStats()?.size===${size} && !document.querySelector('#starsGenerating').classList.contains('show')`,60000);
   const audit=await evaluate(`(()=>{const state=window.__starsDebug.getState(),verified=window.__starsDebug.verify(),stats=window.__starsDebug.getGenerationStats();return{size:state.size,cells:document.querySelectorAll('#starsBoard .cell').length,regions:new Set(state.regions).size,solutions:verified.count,truncated:verified.truncated,stats,before:${before}}})()`);
-  assert.equal(audit.size,size);assert.equal(audit.cells,size*size);assert.equal(audit.regions,size);assert.equal(audit.solutions,1);assert.equal(audit.truncated,false);sizes.push(audit.stats);
+  assert.equal(audit.size,size);assert.equal(audit.cells,size*size);assert.equal(audit.regions,size);assert.equal(audit.solutions,1);assert.equal(audit.truncated,false);assert.equal(audit.stats.forcedRegions,0);assert.ok(audit.stats.generationMs<2500,`${size}×${size} generation took ${audit.stats.generationMs}ms`);sizes.push(audit.stats);
 }
 
 await evaluate(`document.querySelector('#starsDifficulty').value='master';document.querySelector('#starsDifficulty').dispatchEvent(new Event('change',{bubbles:true}));true`);
 await waitFor(`window.__starsDebug.getGenerationStats()?.difficulty==='master' && !document.querySelector('#starsGenerating').classList.contains('show')`,60000);
+const masterStats=await evaluate(`window.__starsDebug.getGenerationStats()`);
+assert.equal(masterStats.forcedRegions,0);assert.ok(masterStats.tightRegions<=Math.ceil(15*.22));assert.ok(masterStats.generationMs<3500,`15×15 master generation took ${masterStats.generationMs}ms`);
+
+const autoXHint=await evaluate(`(()=>{const state=window.__starsDebug.getState(),row=Math.floor(state.solution.findIndex(value=>value===2)/state.size),stars=[];for(let column=0;column<state.size;column++){const index=row*state.size+column;if(state.solution[index]===2)stars.push(index)}if(stars.length!==2)throw new Error('Expected exactly two solution stars in the test row');stars.forEach(index=>window.__starsDebug.setCell(index,2));const blocked=Array.from(document.querySelectorAll('#starsBoard .cell.x')).map(cell=>Number(cell.dataset.i));document.querySelector('#starsHint').click();const hinted=window.__starsDebug.getState().hint?.target,result={row,stars,blockedCount:blocked.length,hinted,hintedWasAutoX:blocked.includes(hinted)};document.querySelector('#starsCloseHint').click();stars.forEach(index=>window.__starsDebug.setCell(index,0));return result})()`);
+assert.ok(autoXHint.blockedCount>0);assert.equal(autoXHint.hintedWasAutoX,false);
 
 await evaluate(`document.querySelector('#starsHint').click();true`);
 await waitFor(`!document.querySelector('#starsHintPanel').hidden && document.querySelectorAll('#starsHintSteps button').length>=3`);
@@ -68,14 +78,16 @@ for(let i=0;i<12;i++)await evaluate(`document.querySelector('#starsHint').click(
 const unlimited=await evaluate(`({disabled:document.querySelector('#starsHint').disabled,label:document.querySelector('#starsHint').textContent,steps:document.querySelectorAll('#starsHintSteps button').length})`);
 assert.equal(unlimited.disabled,false);assert.equal(unlimited.label,'Hint');assert.ok(unlimited.steps>=3);
 
+const noMockLeak=await evaluate(`(()=>{const state=window.__starsDebug.getState(),stars=[];for(let i=0;i<15&&stars.length<2;i++)if(state.solution[i]===2)stars.push(i);stars.forEach(i=>window.__starsDebug.setCell(i,2));const result={mode:window.__starsDebug.getState().mockMode,mockBorders:document.querySelectorAll('#starsBoard .mock-x, #starsBoard .mock-queen').length};stars.forEach(i=>window.__starsDebug.setCell(i,0));return result})()`);
+assert.deepEqual(noMockLeak,{mode:false,mockBorders:0});
 const mock=await evaluate(`(()=>{document.querySelector('#starsMockMode').click();document.querySelector('#starsBoard .cell[data-i="0"]').click();document.querySelector('#starsBoard .cell[data-i="0"]').click();const state=window.__starsDebug.getState();return{mode:state.mockMode,mockStars:state.mockStars.length,mockXs:state.mockXs.length,realMarks:state.cells.filter(Boolean).length,pressed:document.querySelector('#starsMockMode').getAttribute('aria-pressed')}})()`);
 assert.deepEqual(mock,{mode:true,mockStars:1,mockXs:0,realMarks:0,pressed:'true'});
 await evaluate(`document.querySelector('#starsMockMode').click();document.querySelector('#starsClearMocks').click();true`);
 assert.deepEqual(await evaluate(`({stars:window.__starsDebug.getState().mockStars.length,xs:window.__starsDebug.getState().mockXs.length})`),{stars:0,xs:0});
 
-const mistakeHint=await evaluate(`(()=>{const state=window.__starsDebug.getState(),wrong=state.solution.findIndex(value=>value===1);window.__starsDebug.setCell(wrong,2);document.querySelector('#starsHint').click();return{wrong,summary:document.querySelector('#starsHintSummary').textContent,steps:document.querySelectorAll('#starsHintSteps button').length}})()`);
-assert.match(mistakeHint.summary,/prevents every valid completion/i);assert.ok(mistakeHint.steps>=4);
-await evaluate(`document.querySelector('#starsClear').click();true`);
+const mistakeHint=await evaluate(`(()=>{const state=window.__starsDebug.getState(),wrong=state.solution.findIndex(value=>value===1);window.__starsDebug.setCell(wrong,2);document.querySelector('#starsHint').click();const buttons=Array.from(document.querySelectorAll('#starsHintSteps button')),conflict=buttons.find(button=>/contradiction appears/i.test(button.textContent));if(conflict)conflict.click();const problemTiles=window.__starsDebug.getState().visual?.problemTiles?.length||0;buttons.at(-1).click();const tile=document.querySelector('#starsBoard .cell[data-i="'+wrong+'"]');return{wrong,summary:document.querySelector('#starsHintSummary').textContent,steps:buttons.length,conflictText:conflict?.textContent||'',problemTiles,correctionShowsX:tile.classList.contains('x')&&!tile.classList.contains('queen'),realValue:window.__starsDebug.getState().cells[wrong]}})()`);
+assert.match(mistakeHint.summary,/consequences.*exact rule/i);assert.ok(mistakeHint.steps>=6);assert.match(mistakeHint.conflictText,/touch|exactly two|no longer reach|non-touching/i);assert.ok(mistakeHint.problemTiles>0);assert.equal(mistakeHint.correctionShowsX,true);assert.equal(mistakeHint.realValue,2);
+await evaluate(`document.querySelector('#starsClear').click();document.querySelector('#clearConfirmAccept').click();true`);
 
 await evaluate(`document.querySelector('#starsHint').click();true`);
 await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
@@ -90,4 +102,4 @@ await evaluate(`document.querySelector('#starsCloseWin').click();true`);
 
 assert.deepEqual(runtimeErrors,[]);
 socket.close();
-console.log(JSON.stringify({sizes,hint,unlimited,mock,mistakeHint,mobile,win,runtimeErrors},null,2));
+console.log(JSON.stringify({sizes,masterStats,autoXHint,hint,unlimited,noMockLeak,mock,mistakeHint,mobile,win,runtimeErrors},null,2));
