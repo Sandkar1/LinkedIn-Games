@@ -1,4 +1,4 @@
-var CACHE_NAME='puzzle-games-v11-stars-effective-hints';
+var CACHE_NAME='puzzle-games-v12-stars-proof-safe-hints';
 var APP_SHELL_URLS=[
   'assets/app.css',
   'assets/app.js',
@@ -19,10 +19,10 @@ var OFFLINE_URLS=[
   'tango.html',
   'pinpoint.html',
   'crossclimb.html',
-  'assets/app.css?v=20260803-6',
-  'assets/app.js?v=20260803-6',
-  'assets/stars-core.js?v=20260803-6',
-  'assets/stars.js?v=20260803-6'
+  'assets/app.css?v=20260803-7',
+  'assets/app.js?v=20260803-7',
+  'assets/stars-core.js?v=20260803-7',
+  'assets/stars.js?v=20260803-7'
 ];
 
 self.addEventListener('install',function(event){
